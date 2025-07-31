@@ -37,7 +37,7 @@ public class PlayerController : MonoBehaviour
         Vector2 velocity = rb.velocity;
         velocity.x = horizontalInput * moveSpeed;
         rb.velocity = velocity;
-        
+
         // Check if grounded
         CheckGrounded();
         Debug.Log("isGrounded: " + isGrounded);

@@ -17,10 +17,13 @@ public class SimpleHealthBar : MonoBehaviour
     
     private void Update()
     {
-        if (player != null && fillImage != null)
-        {
-            float healthPercent = player.GetHealth() / player.GetMaxHealth();
-            fillImage.fillAmount = healthPercent;
-        }
+        //if (player != null && fillImage != null)
+        //{
+        //    float healthPercent = player.GetHealth() / player.GetMaxHealth();
+        //    fillImage.fillAmount = healthPercent;
+        //}
+        float healthPercent = player.GetHealth() / player.GetMaxHealth();
+        fillImage.fillAmount = healthPercent;
+
     }
 } 
