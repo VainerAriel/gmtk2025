@@ -1,4 +1,5 @@
 using UnityEngine;
+using System.Collections.Generic;
 
 public class PlayerController : MonoBehaviour
 {
@@ -14,14 +15,49 @@ public class PlayerController : MonoBehaviour
     [SerializeField] private float maxHealth = 100f;
     [SerializeField] private float currentHealth;
     
+    [Header("Ghost System")]
+    [SerializeField] private int maxGhosts = 3;
+    [SerializeField] private Vector3 startPosition = new Vector3(-3.38f, -2.55f, 0f);
+    [SerializeField] private GameObject ghostPrefab;
+    
     private Rigidbody2D rb;
     private bool isGrounded;
     private bool hasJumped = false;
+    
+    // Ghost system variables
+    private List<PlayerAction> recordedActions = new List<PlayerAction>();
+    private List<GhostController> activeGhosts = new List<GhostController>();
+    private float gameStartTime;
+    private bool isRecording = true;
+    
+    [System.Serializable]
+    public class PlayerAction
+    {
+        public float timestamp;
+        public Vector3 position;
+        public Vector2 velocity;
+        public bool isGrounded;
+        public bool hasJumped;
+        public float horizontalInput;
+        public bool jumpPressed;
+        
+        public PlayerAction(float time, Vector3 pos, Vector2 vel, bool grounded, bool jumped, float horizontal, bool jump)
+        {
+            timestamp = time;
+            position = pos;
+            velocity = vel;
+            isGrounded = grounded;
+            hasJumped = jumped;
+            horizontalInput = horizontal;
+            jumpPressed = jump;
+        }
+    }
     
     private void Start()
     {
         rb = GetComponent<Rigidbody2D>();
         currentHealth = maxHealth;
+        gameStartTime = Time.time;
         
         // Prevent rotation
         if (rb != null)
@@ -32,6 +68,12 @@ public class PlayerController : MonoBehaviour
     
     private void Update()
     {
+        // Check for respawn input
+        if (Input.GetKeyDown(KeyCode.X))
+        {
+            RespawnPlayer();
+        }
+        
         // Movement input
         float horizontalInput = Input.GetAxisRaw("Horizontal");
         Vector2 velocity = rb.velocity;
@@ -40,7 +82,6 @@ public class PlayerController : MonoBehaviour
 
         // Check if grounded
         CheckGrounded();
-        Debug.Log("isGrounded: " + isGrounded);
         
         // Reset jump when grounded
         if (isGrounded)
@@ -49,11 +90,121 @@ public class PlayerController : MonoBehaviour
         }
         
         // Jump input - only one jump allowed
-        if (Input.GetButtonDown("Jump") && isGrounded && !hasJumped)
+        bool jumpPressed = Input.GetButtonDown("Jump");
+        if (jumpPressed && isGrounded && !hasJumped)
         {
             rb.AddForce(Vector2.up * jumpForce, ForceMode2D.Impulse);
             hasJumped = true;
         }
+        
+        // Record action if recording
+        if (isRecording)
+        {
+            RecordAction(horizontalInput, jumpPressed);
+        }
+    }
+    
+    private void RecordAction(float horizontalInput, bool jumpPressed)
+    {
+        float currentTime = Time.time - gameStartTime;
+        PlayerAction action = new PlayerAction(
+            currentTime,
+            transform.position,
+            rb.velocity,
+            isGrounded,
+            hasJumped,
+            horizontalInput,
+            jumpPressed
+        );
+        recordedActions.Add(action);
+    }
+    
+    private void RespawnPlayer()
+    {
+        // Stop recording current session
+        isRecording = false;
+        
+        // Create ghost from recorded actions
+        if (recordedActions.Count > 0)
+        {
+            CreateGhost();
+        }
+        
+        // Restart all active ghosts
+        RestartAllGhosts();
+        
+        // Reset player position and state
+        transform.position = startPosition;
+        rb.velocity = Vector2.zero;
+        hasJumped = false;
+        isGrounded = false;
+        
+        // Start new recording session
+        recordedActions.Clear();
+        gameStartTime = Time.time;
+        isRecording = true;
+    }
+    
+    private void RestartAllGhosts()
+    {
+        foreach (GhostController ghost in activeGhosts)
+        {
+            if (ghost != null)
+            {
+                ghost.RestartReplay();
+            }
+        }
+    }
+    
+    private void CreateGhost()
+    {
+        // Remove oldest ghost if at max capacity (FIFO)
+        if (activeGhosts.Count >= maxGhosts)
+        {
+            GhostController oldestGhost = activeGhosts[0];
+            activeGhosts.RemoveAt(0);
+            if (oldestGhost != null)
+            {
+                Destroy(oldestGhost.gameObject);
+            }
+        }
+        
+        // Create ghost object
+        GameObject ghostObject;
+        if (ghostPrefab != null)
+        {
+            ghostObject = Instantiate(ghostPrefab, startPosition, Quaternion.identity);
+        }
+        else
+        {
+            // Create a simple ghost if no prefab is assigned
+            ghostObject = new GameObject("Ghost");
+            ghostObject.transform.position = startPosition;
+            
+            // Add sprite renderer with ghost appearance
+            SpriteRenderer ghostRenderer = ghostObject.AddComponent<SpriteRenderer>();
+            SpriteRenderer playerRenderer = GetComponent<SpriteRenderer>();
+            if (playerRenderer != null && playerRenderer.sprite != null)
+            {
+                ghostRenderer.sprite = playerRenderer.sprite;
+                ghostRenderer.color = new Color(1f, 1f, 1f, 0.5f); // Semi-transparent
+            }
+            
+            // Add collider (non-trigger for visual purposes)
+            BoxCollider2D ghostCollider = ghostObject.AddComponent<BoxCollider2D>();
+            BoxCollider2D playerCollider = GetComponent<BoxCollider2D>();
+            if (playerCollider != null)
+            {
+                ghostCollider.size = playerCollider.size;
+                ghostCollider.offset = playerCollider.offset;
+            }
+            ghostCollider.isTrigger = true; // Make it non-solid
+        }
+        
+        // Add ghost controller
+        GhostController ghostController = ghostObject.AddComponent<GhostController>();
+        ghostController.Initialize(recordedActions.ToArray());
+        activeGhosts.Add(ghostController);
     }
     
     private void CheckGrounded()
