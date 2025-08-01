@@ -9,18 +9,29 @@ public class GhostController : MonoBehaviour
     private SpriteRenderer spriteRenderer;
     private bool isReplaying = true;
     private bool allowPhysicsAfterFreeze = false;
+    private bool isGrounded = false;
+    private bool hasJumped = false;
+    private float moveSpeed = 5f;
+    private float jumpForce = 14f;
     
     [Header("Ghost Settings")]
     [SerializeField] private float ghostAlpha = 0.5f;
     [SerializeField] private Color ghostColor = new Color(1f, 1f, 1f, 0.5f);
+    [SerializeField] private LayerMask groundLayer = 1 | (1 << 8); // Default layer + Ground layer
+    [SerializeField] private float groundCheckDistance = 0.1f;
     
-    public void Initialize(PlayerController.PlayerAction[] actions, bool allowPhysicsAfterFreeze)
+    private PhysicsMaterial2D originalMaterial;
+    
+    public void Initialize(PlayerController.PlayerAction[] actions, bool allowPhysicsAfterFreeze, float moveSpeed, float jumpForce, PhysicsMaterial2D playerMaterial)
     {
         recordedActions = actions;
         this.allowPhysicsAfterFreeze = allowPhysicsAfterFreeze;
+        this.moveSpeed = moveSpeed;
+        this.jumpForce = jumpForce;
         ghostStartTime = Time.time;
         currentActionIndex = 0;
         isReplaying = true;
+        hasJumped = false;
         
         // Get or add required components
         rb = GetComponent<Rigidbody2D>();
@@ -32,7 +43,15 @@ public class GhostController : MonoBehaviour
         // Configure rigidbody for ghost behavior
         rb.gravityScale = 3f; // Same as player
         rb.freezeRotation = true;
-        rb.drag = 0f;
+        rb.drag = 0f; // No drag to match player
+        rb.mass = 1f; // Same mass as player
+        
+        // Use the same physics material as the player
+        if (playerMaterial != null)
+        {
+            rb.sharedMaterial = playerMaterial;
+            originalMaterial = playerMaterial; // Store the original material
+        }
         
         // Set up visual appearance
         spriteRenderer = GetComponent<SpriteRenderer>();
@@ -45,9 +64,15 @@ public class GhostController : MonoBehaviour
         BoxCollider2D ghostCollider = GetComponent<BoxCollider2D>();
         if (ghostCollider != null)
         {
-            // Start as trigger during replay, will be made solid if physics mode is enabled
-            ghostCollider.isTrigger = true;
+            // Make it solid so it can interact with the real world
+            ghostCollider.isTrigger = false;
         }
+        
+        // Ensure ghost is on Ghost layer
+        gameObject.layer = LayerMask.NameToLayer("Ghost");
+        
+        // Set ground layer mask to detect Default and Ground layers
+        groundLayer = LayerMask.GetMask("Default", "Ground");
         
         // Set initial position
         if (recordedActions.Length > 0)
@@ -62,6 +87,7 @@ public class GhostController : MonoBehaviour
         ghostStartTime = Time.time;
         currentActionIndex = 0;
         isReplaying = true;
+        hasJumped = false;
         
         // Reset rigidbody
         if (rb != null)
@@ -74,7 +100,13 @@ public class GhostController : MonoBehaviour
         BoxCollider2D ghostCollider = GetComponent<BoxCollider2D>();
         if (ghostCollider != null)
         {
-            ghostCollider.isTrigger = true; // Back to trigger mode for replay
+            ghostCollider.isTrigger = false; // Keep solid for real world interaction
+        }
+        
+        // Restore original physics material
+        if (rb != null && originalMaterial != null)
+        {
+            rb.sharedMaterial = originalMaterial;
         }
         
         // Reset visual appearance
@@ -96,6 +128,15 @@ public class GhostController : MonoBehaviour
         {
             // Ghost has finished replaying, just stay frozen
             return;
+        }
+        
+        // Check if grounded
+        CheckGrounded();
+        
+        // Reset jump when grounded
+        if (isGrounded)
+        {
+            hasJumped = false;
         }
         
         if (recordedActions == null || recordedActions.Length == 0 || currentActionIndex >= recordedActions.Length)
@@ -120,24 +161,40 @@ public class GhostController : MonoBehaviour
         UpdateVisualAppearance();
     }
     
+    private void CheckGrounded()
+    {
+        // Get the ghost's collider to find the bottom position
+        Collider2D ghostCollider = GetComponent<Collider2D>();
+        if (ghostCollider == null) return;
+        
+        // Calculate the bottom center of the ghost
+        Vector2 bottomCenter = (Vector2)transform.position + ghostCollider.offset;
+        bottomCenter.y -= ghostCollider.bounds.extents.y;
+        
+        // Cast ray from bottom center downward
+        RaycastHit2D hit = Physics2D.Raycast(bottomCenter, Vector2.down, groundCheckDistance, groundLayer);
+        isGrounded = hit.collider != null;
+        
+        // Debug visualization
+        Debug.DrawRay(bottomCenter, Vector2.down * groundCheckDistance, isGrounded ? Color.green : Color.red);
+    }
+    
     private void ApplyAction(PlayerController.PlayerAction action)
     {
-        // Set position
-        transform.position = action.position;
-        
-        // Set velocity
+        // Use velocity-based movement instead of forces for better control
         if (rb != null)
         {
-            rb.velocity = action.velocity;
-        }
-        
-        // Handle jump if it was pressed
-        if (action.jumpPressed && action.isGrounded && !action.hasJumped)
-        {
-            // Apply jump force (same as player)
-            if (rb != null)
+            // Set horizontal velocity directly (like the player does)
+            Vector2 velocity = rb.velocity;
+            velocity.x = action.horizontalInput * moveSpeed; // Same speed as player
+            rb.velocity = velocity;
+            
+            // Handle jump if it was pressed and ghost is actually grounded (not just recorded as grounded)
+            if (action.jumpPressed && isGrounded && !hasJumped)
             {
-                rb.AddForce(Vector2.up * 14f, ForceMode2D.Impulse);
+                // Apply jump force (same as player)
+                rb.AddForce(Vector2.up * jumpForce, ForceMode2D.Impulse);
+                hasJumped = true;
             }
         }
     }
@@ -149,13 +206,7 @@ public class GhostController : MonoBehaviour
         if (allowPhysicsAfterFreeze)
         {
             // Let physics continue naturally (ghost will fall, bounce, etc.)
-            // Make the collider solid so it can collide with ground
-            BoxCollider2D ghostCollider = GetComponent<BoxCollider2D>();
-            if (ghostCollider != null)
-            {
-                ghostCollider.isTrigger = false; // Make it solid so it can collide with ground
-            }
-            
+            // Ghost is already solid, so it can continue physics
             if (spriteRenderer != null)
             {
                 Color frozenColor = spriteRenderer.color;
@@ -171,21 +222,25 @@ public class GhostController : MonoBehaviour
                 rb.velocity = Vector2.zero;
                 rb.isKinematic = true; // Make it kinematic so it doesn't fall
             }
-            
-            // Keep collider as trigger for non-physics mode
-            BoxCollider2D ghostCollider = GetComponent<BoxCollider2D>();
-            if (ghostCollider != null)
-            {
-                ghostCollider.isTrigger = true; // Keep it as trigger
-            }
-            
-            // Make the ghost slightly more transparent when frozen
-            if (spriteRenderer != null)
-            {
-                Color frozenColor = spriteRenderer.color;
-                frozenColor.a = ghostAlpha * 0.7f; // Make it more transparent when frozen
-                spriteRenderer.color = frozenColor;
-            }
+        }
+        
+        // Always change to high friction material when frozen to prevent sliding
+        if (rb != null)
+        {
+            // Create a high friction material for frozen ghosts
+            PhysicsMaterial2D frozenMaterial = new PhysicsMaterial2D();
+            frozenMaterial.name = "FrozenGhostMaterial";
+            frozenMaterial.friction = 1f; // High friction to prevent sliding
+            frozenMaterial.bounciness = 0f; // No bouncing
+            rb.sharedMaterial = frozenMaterial;
+        }
+        
+        // Make the ghost slightly more transparent when frozen
+        if (spriteRenderer != null)
+        {
+            Color frozenColor = spriteRenderer.color;
+            frozenColor.a = ghostAlpha * 0.7f; // Make it more transparent when frozen
+            spriteRenderer.color = frozenColor;
         }
         
         // Optional: Add a subtle visual effect to indicate it's frozen

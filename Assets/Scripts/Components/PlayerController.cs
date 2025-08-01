@@ -60,6 +60,9 @@ public class PlayerController : MonoBehaviour
         currentHealth = maxHealth;
         gameStartTime = Time.time;
         
+        // Set player to Player layer
+        gameObject.layer = LayerMask.NameToLayer("Player");
+        
         // Prevent rotation
         if (rb != null)
         {
@@ -202,9 +205,12 @@ public class PlayerController : MonoBehaviour
             ghostCollider.isTrigger = true; // Make it non-solid
         }
         
+        // Set ghost to Ghost layer
+        ghostObject.layer = LayerMask.NameToLayer("Ghost");
+        
         // Add ghost controller
         GhostController ghostController = ghostObject.AddComponent<GhostController>();
-        ghostController.Initialize(recordedActions.ToArray(), allowGhostPhysicsAfterFreeze);
+        ghostController.Initialize(recordedActions.ToArray(), allowGhostPhysicsAfterFreeze, moveSpeed, jumpForce, rb.sharedMaterial);
         activeGhosts.Add(ghostController);
     }
     
