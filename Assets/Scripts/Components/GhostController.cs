@@ -8,14 +8,16 @@ public class GhostController : MonoBehaviour
     private Rigidbody2D rb;
     private SpriteRenderer spriteRenderer;
     private bool isReplaying = true;
+    private bool allowPhysicsAfterFreeze = false;
     
     [Header("Ghost Settings")]
     [SerializeField] private float ghostAlpha = 0.5f;
     [SerializeField] private Color ghostColor = new Color(1f, 1f, 1f, 0.5f);
     
-    public void Initialize(PlayerController.PlayerAction[] actions)
+    public void Initialize(PlayerController.PlayerAction[] actions, bool allowPhysicsAfterFreeze)
     {
         recordedActions = actions;
+        this.allowPhysicsAfterFreeze = allowPhysicsAfterFreeze;
         ghostStartTime = Time.time;
         currentActionIndex = 0;
         isReplaying = true;
@@ -39,6 +41,14 @@ public class GhostController : MonoBehaviour
             spriteRenderer.color = ghostColor;
         }
         
+        // Set up collider for physics mode
+        BoxCollider2D ghostCollider = GetComponent<BoxCollider2D>();
+        if (ghostCollider != null)
+        {
+            // Start as trigger during replay, will be made solid if physics mode is enabled
+            ghostCollider.isTrigger = true;
+        }
+        
         // Set initial position
         if (recordedActions.Length > 0)
         {
@@ -58,6 +68,13 @@ public class GhostController : MonoBehaviour
         {
             rb.isKinematic = false; // Make it dynamic again
             rb.velocity = Vector2.zero;
+        }
+        
+        // Reset collider to trigger mode for replay
+        BoxCollider2D ghostCollider = GetComponent<BoxCollider2D>();
+        if (ghostCollider != null)
+        {
+            ghostCollider.isTrigger = true; // Back to trigger mode for replay
         }
         
         // Reset visual appearance
@@ -129,19 +146,46 @@ public class GhostController : MonoBehaviour
     {
         isReplaying = false;
         
-        // Stop all movement
-        if (rb != null)
+        if (allowPhysicsAfterFreeze)
         {
-            rb.velocity = Vector2.zero;
-            rb.isKinematic = true; // Make it kinematic so it doesn't fall
+            // Let physics continue naturally (ghost will fall, bounce, etc.)
+            // Make the collider solid so it can collide with ground
+            BoxCollider2D ghostCollider = GetComponent<BoxCollider2D>();
+            if (ghostCollider != null)
+            {
+                ghostCollider.isTrigger = false; // Make it solid so it can collide with ground
+            }
+            
+            if (spriteRenderer != null)
+            {
+                Color frozenColor = spriteRenderer.color;
+                frozenColor.a = ghostAlpha * 0.8f; // Slightly more transparent when frozen
+                spriteRenderer.color = frozenColor;
+            }
         }
-        
-        // Make the ghost slightly more transparent when frozen
-        if (spriteRenderer != null)
+        else
         {
-            Color frozenColor = spriteRenderer.color;
-            frozenColor.a = ghostAlpha * 0.7f; // Make it more transparent when frozen
-            spriteRenderer.color = frozenColor;
+            // Stop all movement immediately
+            if (rb != null)
+            {
+                rb.velocity = Vector2.zero;
+                rb.isKinematic = true; // Make it kinematic so it doesn't fall
+            }
+            
+            // Keep collider as trigger for non-physics mode
+            BoxCollider2D ghostCollider = GetComponent<BoxCollider2D>();
+            if (ghostCollider != null)
+            {
+                ghostCollider.isTrigger = true; // Keep it as trigger
+            }
+            
+            // Make the ghost slightly more transparent when frozen
+            if (spriteRenderer != null)
+            {
+                Color frozenColor = spriteRenderer.color;
+                frozenColor.a = ghostAlpha * 0.7f; // Make it more transparent when frozen
+                spriteRenderer.color = frozenColor;
+            }
         }
         
         // Optional: Add a subtle visual effect to indicate it's frozen

@@ -371,6 +371,7 @@ MonoBehaviour:
   maxGhosts: 3
   startPosition: {x: -3.38, y: -2.55, z: 0}
   ghostPrefab: {fileID: 0}
+  allowGhostPhysicsAfterFreeze: 1
 --- !u!1 &449522660
 GameObject:
   m_ObjectHideFlags: 0

@@ -19,6 +19,7 @@ public class PlayerController : MonoBehaviour
     [SerializeField] private int maxGhosts = 3;
     [SerializeField] private Vector3 startPosition = new Vector3(-3.38f, -2.55f, 0f);
     [SerializeField] private GameObject ghostPrefab;
+    [SerializeField] private bool allowGhostPhysicsAfterFreeze = false;
     
     private Rigidbody2D rb;
     private bool isGrounded;
@@ -203,7 +204,7 @@ public class PlayerController : MonoBehaviour
         
         // Add ghost controller
         GhostController ghostController = ghostObject.AddComponent<GhostController>();
-        ghostController.Initialize(recordedActions.ToArray());
+        ghostController.Initialize(recordedActions.ToArray(), allowGhostPhysicsAfterFreeze);
         activeGhosts.Add(ghostController);
     }
     
