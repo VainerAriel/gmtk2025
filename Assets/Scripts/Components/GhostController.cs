@@ -40,17 +40,36 @@ public class GhostController : MonoBehaviour
             rb = gameObject.AddComponent<Rigidbody2D>();
         }
         
-        // Configure rigidbody for ghost behavior
+        // Configure rigidbody for ghost behavior - EXACTLY like the player
         rb.gravityScale = 3f; // Same as player
         rb.freezeRotation = true;
         rb.drag = 0f; // No drag to match player
         rb.mass = 1f; // Same mass as player
+        rb.angularDrag = 0.05f; // Same as player
+        rb.interpolation = RigidbodyInterpolation2D.None; // Same as player
+        rb.sleepMode = RigidbodySleepMode2D.StartAwake; // Same as player
+        rb.constraints = RigidbodyConstraints2D.FreezeRotation; // Same as player
         
         // Use the same physics material as the player
         if (playerMaterial != null)
         {
             rb.sharedMaterial = playerMaterial;
             originalMaterial = playerMaterial; // Store the original material
+        }
+        else
+        {
+            // Fallback: Try to load the ZeroFriction material directly
+            PhysicsMaterial2D zeroFrictionMaterial = Resources.Load<PhysicsMaterial2D>("ZeroFriction");
+            if (zeroFrictionMaterial == null)
+            {
+                // If not in Resources, try to load from the Components folder
+                zeroFrictionMaterial = Resources.Load<PhysicsMaterial2D>("Scripts/Components/ZeroFriction");
+            }
+            if (zeroFrictionMaterial != null)
+            {
+                rb.sharedMaterial = zeroFrictionMaterial;
+                originalMaterial = zeroFrictionMaterial;
+            }
         }
         
         // Set up visual appearance
@@ -60,12 +79,16 @@ public class GhostController : MonoBehaviour
             spriteRenderer.color = ghostColor;
         }
         
-        // Set up collider for physics mode
+        // Set up collider for physics mode - EXACTLY like the player
         BoxCollider2D ghostCollider = GetComponent<BoxCollider2D>();
         if (ghostCollider != null)
         {
             // Make it solid so it can interact with the real world
             ghostCollider.isTrigger = false;
+            ghostCollider.density = 1f; // Same as player
+            ghostCollider.usedByEffector = false; // Same as player
+            ghostCollider.usedByComposite = false; // Same as player
+            ghostCollider.offset = Vector2.zero; // Same as player
         }
         
         // Ensure ghost is on Ghost layer
@@ -203,10 +226,23 @@ public class GhostController : MonoBehaviour
     {
         isReplaying = false;
         
+        // IMMEDIATELY stop all movement to prevent sliding
+        if (rb != null)
+        {
+            rb.velocity = Vector2.zero; // Stop all movement immediately
+            rb.isKinematic = true; // Make it kinematic so it doesn't move at all
+        }
+        
         if (allowPhysicsAfterFreeze)
         {
             // Let physics continue naturally (ghost will fall, bounce, etc.)
-            // Ghost is already solid, so it can continue physics
+            // But first stop the current movement
+            if (rb != null)
+            {
+                rb.isKinematic = false; // Make it dynamic again for physics
+                rb.velocity = Vector2.zero; // But stop current movement
+            }
+            
             if (spriteRenderer != null)
             {
                 Color frozenColor = spriteRenderer.color;
@@ -216,10 +252,9 @@ public class GhostController : MonoBehaviour
         }
         else
         {
-            // Stop all movement immediately
+            // Keep it kinematic to prevent any movement
             if (rb != null)
             {
-                rb.velocity = Vector2.zero;
                 rb.isKinematic = true; // Make it kinematic so it doesn't fall
             }
         }
