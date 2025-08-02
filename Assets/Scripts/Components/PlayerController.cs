@@ -223,13 +223,13 @@ public class PlayerController : MonoBehaviour
             }
         }
         
-        // Reset all spike timers
-        SpikeTile[] allSpikes = FindObjectsOfType<SpikeTile>();
-        foreach (SpikeTile spike in allSpikes)
+        // Reset all tilemap spike managers
+        TilemapSpikeManager[] tilemapSpikeManagers = FindObjectsOfType<TilemapSpikeManager>();
+        foreach (TilemapSpikeManager spikeManager in tilemapSpikeManagers)
         {
-            if (spike != null)
+            if (spikeManager != null)
             {
-                spike.RestartCycle();
+                spikeManager.RestartCycle();
             }
         }
         
@@ -242,7 +242,6 @@ public class PlayerController : MonoBehaviour
             }
         }
         
-        Debug.Log($"[PlayerController] Game state reset - Cleared reflectors, destroyed {allProjectiles.Length} bullets, reset {projectileShooters.Length} projectile shooters, {tilemapShooters.Length} tilemap shooters, reset {allSpikes.Length} spikes, and reset {activeGhosts.Count} ghosts");
     }
     
     private void RestartAllGhosts()

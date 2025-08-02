@@ -1,9 +1,13 @@
 using UnityEngine;
+using UnityEngine.Tilemaps;
 using System.Collections;
+using System.Collections.Generic;
 
-public class SpikeTile : MonoBehaviour
+public class TilemapSpikeManager : MonoBehaviour
 {
-    [Header("Spike Settings")]
+    [Header("Tilemap Settings")]
+    [SerializeField] private Tilemap tilemap;
+    [SerializeField] private TileBase spikeTile; // The tile that represents spikes
     [SerializeField] private float damage = 30f;
     [SerializeField] private float activeTime = 2f;
     [SerializeField] private float inactiveTime = 1f;
@@ -11,8 +15,6 @@ public class SpikeTile : MonoBehaviour
     [SerializeField] private bool randomizeStart = false;
     
     [Header("Visual Effects")]
-    [SerializeField] private Sprite activeSprite;
-    [SerializeField] private Sprite inactiveSprite;
     [SerializeField] private Color activeColor = Color.red;
     [SerializeField] private Color inactiveColor = Color.gray;
     [SerializeField] private GameObject spikeEffect;
@@ -21,22 +23,27 @@ public class SpikeTile : MonoBehaviour
     [Header("Debug")]
     [SerializeField] private bool debugMode = true;
     
-    private SpriteRenderer spriteRenderer;
-    private Collider2D spikeCollider;
     private AudioSource audioSource;
     private bool isActive = false;
     private Coroutine spikeCycle;
+    private List<Vector3Int> spikePositions = new List<Vector3Int>();
     
     private void Start()
     {
-        spriteRenderer = GetComponent<SpriteRenderer>();
-        spikeCollider = GetComponent<Collider2D>();
         audioSource = GetComponent<AudioSource>();
-        
         if (audioSource == null)
         {
             audioSource = gameObject.AddComponent<AudioSource>();
         }
+        
+        // Get tilemap if not assigned
+        if (tilemap == null)
+        {
+            tilemap = GetComponent<Tilemap>();
+        }
+        
+        // Find all spike tiles in the tilemap
+        FindSpikeTiles();
         
         // Initialize spike state
         if (randomizeStart)
@@ -52,7 +59,30 @@ public class SpikeTile : MonoBehaviour
         
         if (debugMode)
         {
-            Debug.Log($"[SpikeTile] {gameObject.name} initialized - Active: {isActive}, ActiveTime: {activeTime}s, InactiveTime: {inactiveTime}s");
+            Debug.Log($"[TilemapSpikeManager] {gameObject.name} initialized - Active: {isActive}, ActiveTime: {activeTime}s, InactiveTime: {inactiveTime}s, SpikeTiles: {spikePositions.Count}");
+        }
+    }
+    
+    private void FindSpikeTiles()
+    {
+        spikePositions.Clear();
+        
+        if (tilemap == null || spikeTile == null) return;
+        
+        BoundsInt bounds = tilemap.cellBounds;
+        
+        for (int x = bounds.xMin; x < bounds.xMax; x++)
+        {
+            for (int y = bounds.yMin; y < bounds.yMax; y++)
+            {
+                Vector3Int tilePosition = new Vector3Int(x, y, 0);
+                TileBase tile = tilemap.GetTile(tilePosition);
+                
+                if (tile == spikeTile)
+                {
+                    spikePositions.Add(tilePosition);
+                }
+            }
         }
     }
     
@@ -65,7 +95,7 @@ public class SpikeTile : MonoBehaviour
                 // Spike is active - wait for active time
                 if (debugMode)
                 {
-                    Debug.Log($"[SpikeTile] {gameObject.name} is active for {activeTime} seconds");
+                    Debug.Log($"[TilemapSpikeManager] {gameObject.name} is active for {activeTime} seconds");
                 }
                 yield return new WaitForSeconds(activeTime);
                 
@@ -77,7 +107,7 @@ public class SpikeTile : MonoBehaviour
                 // Spike is inactive - wait for inactive time
                 if (debugMode)
                 {
-                    Debug.Log($"[SpikeTile] {gameObject.name} is inactive for {inactiveTime} seconds");
+                    Debug.Log($"[TilemapSpikeManager] {gameObject.name} is inactive for {inactiveTime} seconds");
                 }
                 yield return new WaitForSeconds(inactiveTime);
                 
@@ -94,34 +124,22 @@ public class SpikeTile : MonoBehaviour
         
         if (debugMode)
         {
-            Debug.Log($"[SpikeTile] {gameObject.name} set to {(active ? "ACTIVE" : "INACTIVE")}");
+            Debug.Log($"[TilemapSpikeManager] {gameObject.name} set to {(active ? "ACTIVE" : "INACTIVE")}");
         }
     }
     
     private void UpdateSpikeVisuals()
     {
-        if (spriteRenderer != null)
-        {
-            // Update sprite
-            if (isActive && activeSprite != null)
-            {
-                spriteRenderer.sprite = activeSprite;
-            }
-            else if (!isActive && inactiveSprite != null)
-            {
-                spriteRenderer.sprite = inactiveSprite;
-            }
-            
-            // Update color and transparency
-            Color currentColor = isActive ? activeColor : inactiveColor;
-            currentColor.a = isActive ? 1f : 0.5f; // Full opacity when active, half transparent when inactive
-            spriteRenderer.color = currentColor;
-        }
+        if (tilemap == null) return;
         
-        // Update collider
-        if (spikeCollider != null)
+        foreach (Vector3Int position in spikePositions)
         {
-            spikeCollider.enabled = isActive;
+            // Update tile color with transparency
+            Color tileColor = isActive ? activeColor : inactiveColor;
+            tileColor.a = isActive ? 1f : 0.5f; // Full opacity when active, half transparent when inactive
+            
+            tilemap.SetTileFlags(position, TileFlags.None); // Remove all flags to allow color changes
+            tilemap.SetColor(position, tileColor);
         }
     }
     
@@ -134,7 +152,7 @@ public class SpikeTile : MonoBehaviour
         {
             if (debugMode)
             {
-                Debug.Log($"[SpikeTile] {gameObject.name} hit player, dealing {damage} damage");
+                Debug.Log($"[TilemapSpikeManager] {gameObject.name} hit player, dealing {damage} damage");
             }
             
             player.TakeDamage(damage);
@@ -142,7 +160,7 @@ public class SpikeTile : MonoBehaviour
             // Visual and audio effects
             if (spikeEffect != null)
             {
-                Instantiate(spikeEffect, transform.position, Quaternion.identity);
+                Instantiate(spikeEffect, other.transform.position, Quaternion.identity);
             }
             
             if (spikeSound != null && audioSource != null)
@@ -190,7 +208,7 @@ public class SpikeTile : MonoBehaviour
         
         if (debugMode)
         {
-            Debug.Log($"[SpikeTile] {gameObject.name} timing updated - Active: {activeTime}s, Inactive: {inactiveTime}s");
+            Debug.Log($"[TilemapSpikeManager] {gameObject.name} timing updated - Active: {activeTime}s, Inactive: {inactiveTime}s");
         }
     }
     
@@ -222,14 +240,36 @@ public class SpikeTile : MonoBehaviour
         
         if (debugMode)
         {
-            Debug.Log($"[SpikeTile] {gameObject.name} cycle restarted - Reset to initial state: {(isActive ? "ACTIVE" : "INACTIVE")}");
+            Debug.Log($"[TilemapSpikeManager] {gameObject.name} cycle restarted - Reset to initial state: {(isActive ? "ACTIVE" : "INACTIVE")}");
+        }
+    }
+    
+    /// <summary>
+    /// Refresh the spike tile positions (call this if you modify the tilemap)
+    /// </summary>
+    public void RefreshSpikeTiles()
+    {
+        FindSpikeTiles();
+        UpdateSpikeVisuals();
+        
+        if (debugMode)
+        {
+            Debug.Log($"[TilemapSpikeManager] {gameObject.name} refreshed - Found {spikePositions.Count} spike tiles");
         }
     }
     
     // Gizmos for visual debugging
     private void OnDrawGizmosSelected()
     {
-        Gizmos.color = isActive ? Color.red : Color.gray;
-        Gizmos.DrawWireCube(transform.position, Vector3.one);
+        if (tilemap != null && spikePositions.Count > 0)
+        {
+            Gizmos.color = isActive ? Color.red : Color.gray;
+            
+            foreach (Vector3Int position in spikePositions)
+            {
+                Vector3 worldPosition = tilemap.GetCellCenterWorld(position);
+                Gizmos.DrawWireCube(worldPosition, Vector3.one * 0.8f);
+            }
+        }
     }
 } 
