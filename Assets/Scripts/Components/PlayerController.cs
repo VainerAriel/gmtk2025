@@ -215,6 +215,9 @@ public class PlayerController : MonoBehaviour
 
         // Find all PushableBlock objects in the scene and reset their positions
         ResetAllPushableBlocks();
+        
+        // Reset all pressure plates
+        ResetAllPressurePlates();
 
         // Reset player position and state
         transform.position = startPosition;
@@ -303,6 +306,19 @@ public class PlayerController : MonoBehaviour
         foreach (PushableBlock block in allBlocks)
         {
             block.ResetPosition();
+        }
+    }
+    
+    // New method to reset all pressure plates
+    private void ResetAllPressurePlates()
+    {
+        // Find all active PressurePlate components in the scene
+        PressurePlate[] allPlates = FindObjectsOfType<PressurePlate>();
+
+        // Iterate through each plate and call the ResetPlate method
+        foreach (PressurePlate plate in allPlates)
+        {
+            plate.ResetPlate();
         }
     }
     

@@ -20,6 +20,7 @@ public class LayerCollisionSetup : MonoBehaviour
         int ghostLayer = LayerMask.NameToLayer("Ghost");
         int defaultLayer = LayerMask.NameToLayer("Default");
         int groundLayer = LayerMask.NameToLayer("Ground");
+        int pressurePlateLayer = LayerMask.NameToLayer("PressurePlate");
         
         // Disable collision between Player and Ghost layers
         if (playerLayer != -1 && ghostLayer != -1)
@@ -54,6 +55,28 @@ public class LayerCollisionSetup : MonoBehaviour
         if (ghostLayer != -1 && groundLayer != -1)
         {
             Physics2D.IgnoreLayerCollision(ghostLayer, groundLayer, false);
+        }
+        
+        // Setup pressure plate layer collisions
+        if (pressurePlateLayer != -1)
+        {
+            // Player can collide with pressure plates (both solid and trigger)
+            if (playerLayer != -1)
+            {
+                Physics2D.IgnoreLayerCollision(playerLayer, pressurePlateLayer, false);
+            }
+            
+            // Ghosts can collide with pressure plates
+            if (ghostLayer != -1)
+            {
+                Physics2D.IgnoreLayerCollision(ghostLayer, pressurePlateLayer, false);
+            }
+            
+            // Pressure plates can collide with ground
+            if (groundLayer != -1)
+            {
+                Physics2D.IgnoreLayerCollision(pressurePlateLayer, groundLayer, false);
+            }
         }
         
         Debug.Log("Layer collision setup complete!");
