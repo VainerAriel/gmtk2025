@@ -1,5 +1,8 @@
 using UnityEngine;
 using System.Collections.Generic;
+using UnityEngine.Windows;
+using Input = UnityEngine.Input;
+using Unity.Burst.CompilerServices;
 
 public class PlayerController : MonoBehaviour
 {
@@ -26,10 +29,17 @@ public class PlayerController : MonoBehaviour
     [SerializeField] private Vector3 startPosition = new Vector3(-3.38f, -2.55f, 0f);
     [SerializeField] private GameObject ghostPrefab;
     [SerializeField] private bool allowGhostPhysicsAfterFreeze = false;
-    
+
+    [Header("Pushable Boxes")]
+    [SerializeField] private LayerMask pushableLayer;  // Assign in inspector to the layer your blocks are on
+    [SerializeField] private float pushDistance = 0.51f;  // How far to check for blocks
+
     private Rigidbody2D rb;
     private bool isGrounded;
     private bool hasJumped = false;
+
+    private float blockPushCooldown = 0.2f;
+    private float blockPushTimer = 0f;
 
     Animator animator;
     
@@ -79,7 +89,7 @@ public class PlayerController : MonoBehaviour
             rb.freezeRotation = true;
         }
     }
-    
+
     private void Update()
     {
         // Check for respawn input
@@ -87,7 +97,7 @@ public class PlayerController : MonoBehaviour
         {
             RespawnPlayer();
         }
-        
+
         // Movement input
         float horizontalInput = Input.GetAxisRaw("Horizontal");
         Vector2 velocity = rb.velocity;
@@ -99,13 +109,13 @@ public class PlayerController : MonoBehaviour
 
         // Check if grounded
         CheckGrounded();
-        
+
         // Reset jump when grounded
         if (isGrounded)
         {
             hasJumped = false;
         }
-        
+
         // Jump input - only one jump allowed
         bool jumpPressed = Input.GetButtonDown("Jump");
         if (jumpPressed && isGrounded && !hasJumped)
@@ -113,13 +123,13 @@ public class PlayerController : MonoBehaviour
             rb.AddForce(Vector2.up * jumpForce, ForceMode2D.Impulse);
             hasJumped = true;
         }
-        
+
         // Record action if recording
         if (isRecording)
         {
             RecordAction(horizontalInput, jumpPressed);
         }
-        
+
         // Check for death boundary
         CheckDeathBoundary();
 
@@ -132,8 +142,47 @@ public class PlayerController : MonoBehaviour
         {
             transform.localScale = new Vector3(-1, transform.localScale.y, transform.localScale.z); // Face left
         }
+
+        // Always count down timer, regardless of input
+        if (blockPushTimer > 0f)
+        {
+            blockPushTimer -= Time.deltaTime;
+        }
+
+        // Pushable blocks logic
+        if (horizontalInput != 0 && blockPushTimer <= 0f)
+        {
+            Vector2 direction = new Vector2(Mathf.Sign(horizontalInput), 0);
+
+            Vector2 boxOrigin = (Vector2)transform.position;  // Use transform.position or offset slightly if needed
+            Vector2 boxSize = new Vector2(0.3f, 0.9f);         // Thin vertical strip for horizontal push
+
+            RaycastHit2D hit = Physics2D.BoxCast(
+                boxOrigin,
+                boxSize,
+                0f,
+                direction,
+                pushDistance,
+                pushableLayer
+            );
+
+            Debug.DrawRay(boxOrigin, direction * pushDistance, Color.red); // Visualize raycast in Scene view
+
+            if (hit.collider != null)
+            {
+                PushableBlock block = hit.collider.GetComponent<PushableBlock>();
+                if (block != null)
+                {
+                    if (block.TryMove(direction))
+                    {
+                        blockPushTimer = blockPushCooldown;
+                    }
+                }
+            }
+        }
+        
     }
-    
+
     private void RecordAction(float horizontalInput, bool jumpPressed)
     {
         float currentTime = Time.time - gameStartTime;
