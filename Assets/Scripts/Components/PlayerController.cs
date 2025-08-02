@@ -30,6 +30,8 @@ public class PlayerController : MonoBehaviour
     private Rigidbody2D rb;
     private bool isGrounded;
     private bool hasJumped = false;
+
+    Animator animator;
     
     // Ghost system variables
     private List<PlayerAction> recordedActions = new List<PlayerAction>();
@@ -62,6 +64,8 @@ public class PlayerController : MonoBehaviour
     
     private void Start()
     {
+        animator = GetComponent<Animator>();
+
         rb = GetComponent<Rigidbody2D>();
         currentHealth = maxHealth;
         gameStartTime = Time.time;
@@ -90,6 +94,9 @@ public class PlayerController : MonoBehaviour
         velocity.x = horizontalInput * moveSpeed;
         rb.velocity = velocity;
 
+        // Animation inputs
+        animator.SetFloat("xVelocity", System.Math.Abs(rb.velocity.x));
+
         // Check if grounded
         CheckGrounded();
         
@@ -115,6 +122,16 @@ public class PlayerController : MonoBehaviour
         
         // Check for death boundary
         CheckDeathBoundary();
+
+        // Flip character sprite based on movement direction
+        if (horizontalInput > 0)
+        {
+            transform.localScale = new Vector3(1, transform.localScale.y, transform.localScale.z); // Face right
+        }
+        else if (horizontalInput < 0)
+        {
+            transform.localScale = new Vector3(-1, transform.localScale.y, transform.localScale.z); // Face left
+        }
     }
     
     private void RecordAction(float horizontalInput, bool jumpPressed)
