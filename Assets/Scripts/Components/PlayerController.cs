@@ -39,6 +39,8 @@ public class PlayerController : MonoBehaviour
     private float gameStartTime;
     private bool isRecording = true;
     
+    private bool isPoisoned = false;
+    
     [System.Serializable]
     public class PlayerAction
     {
@@ -163,6 +165,9 @@ public class PlayerController : MonoBehaviour
         // Restart all active ghosts
         RestartAllGhosts();
         
+        // Clear poison status on respawn
+        SetPoisoned(false);
+        
         // Reset player position and state
         transform.position = startPosition;
         rb.velocity = Vector2.zero;
@@ -263,6 +268,9 @@ public class PlayerController : MonoBehaviour
         currentHealth -= damage;
         if (currentHealth <= 0)
         {
+            // Clear poison when player dies
+            SetPoisoned(false);
+            
             // Automatic respawn when health reaches zero
             RespawnPlayer();
             currentHealth = maxHealth;
@@ -301,5 +309,17 @@ public class PlayerController : MonoBehaviour
             RespawnPlayer();
             currentHealth = maxHealth;
         }
+    }
+
+    public bool IsPoisoned()
+    {
+        return isPoisoned;
+    }
+
+    public void SetPoisoned(bool poisoned)
+    {
+        isPoisoned = poisoned;
+        
+        Debug.Log($"[PlayerController] Poison status: {poisoned}");
     }
 } 

@@ -20,7 +20,7 @@ TagManager:
   - Reflect
   - Projectile_Shooter
   - Spike
-  - 
+  - Acid_Pool
   - 
   - 
   - 
@@ -44,6 +44,9 @@ TagManager:
     locked: 0
   - name: BG
     uniqueID: 406282791
+    locked: 0
+  - name: Acid Pool
+    uniqueID: 1773048773
     locked: 0
   - name: Projectiles
     uniqueID: 293057827
