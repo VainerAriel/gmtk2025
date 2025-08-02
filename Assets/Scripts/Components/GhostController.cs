@@ -13,17 +13,24 @@ public class GhostController : MonoBehaviour
     private bool hasJumped = false;
     private float moveSpeed = 5f;
     private float jumpForce = 14f;
-    
+
+    // Block-pushing variables (copied from PlayerController)
+    [SerializeField] private LayerMask pushableLayer;
+    [SerializeField] private float pushDistance = 0.51f;
+
+    private float blockPushCooldown = 0.2f;
+    private float blockPushTimer = 0f;
+
     [Header("Ghost Settings")]
     [SerializeField] private float ghostAlpha = 0.5f;
     [SerializeField] private Color ghostColor = new Color(1f, 1f, 1f, 0.5f);
     [SerializeField] private LayerMask groundLayer = 1 | (1 << 8); // Default layer + Ground layer
     [SerializeField] private float groundCheckDistance = 0.1f;
-    [SerializeField] private string sortingLayerName = "Player"; // Sorting layer for visual rendering
-    [SerializeField] private int sortingOrder = 0; // Order within the sorting layer
-    
+    [SerializeField] private string sortingLayerName = "Player";
+    [SerializeField] private int sortingOrder = 0;
+
     private PhysicsMaterial2D originalMaterial;
-    
+
     public void Initialize(PlayerController.PlayerAction[] actions, bool allowPhysicsAfterFreeze, float moveSpeed, float jumpForce, PhysicsMaterial2D playerMaterial)
     {
         recordedActions = actions;
@@ -34,37 +41,32 @@ public class GhostController : MonoBehaviour
         currentActionIndex = 0;
         isReplaying = true;
         hasJumped = false;
-        
-        // Get or add required components
+
         rb = GetComponent<Rigidbody2D>();
         if (rb == null)
         {
             rb = gameObject.AddComponent<Rigidbody2D>();
         }
-        
-        // Configure rigidbody for ghost behavior - EXACTLY like the player
-        rb.gravityScale = 3f; // Same as player
+
+        rb.gravityScale = 3f;
         rb.freezeRotation = true;
-        rb.drag = 0f; // No drag to match player
-        rb.mass = 1f; // Same mass as player
-        rb.angularDrag = 0.05f; // Same as player
-        rb.interpolation = RigidbodyInterpolation2D.None; // Same as player
-        rb.sleepMode = RigidbodySleepMode2D.StartAwake; // Same as player
-        rb.constraints = RigidbodyConstraints2D.FreezeRotation; // Same as player
-        
-        // Use the same physics material as the player
+        rb.drag = 0f;
+        rb.mass = 1f;
+        rb.angularDrag = 0.05f;
+        rb.interpolation = RigidbodyInterpolation2D.None;
+        rb.sleepMode = RigidbodySleepMode2D.StartAwake;
+        rb.constraints = RigidbodyConstraints2D.FreezeRotation;
+
         if (playerMaterial != null)
         {
             rb.sharedMaterial = playerMaterial;
-            originalMaterial = playerMaterial; // Store the original material
+            originalMaterial = playerMaterial;
         }
         else
         {
-            // Fallback: Try to load the ZeroFriction material directly
             PhysicsMaterial2D zeroFrictionMaterial = Resources.Load<PhysicsMaterial2D>("ZeroFriction");
             if (zeroFrictionMaterial == null)
             {
-                // If not in Resources, try to load from the Components folder
                 zeroFrictionMaterial = Resources.Load<PhysicsMaterial2D>("Scripts/Components/ZeroFriction");
             }
             if (zeroFrictionMaterial != null)
@@ -73,8 +75,7 @@ public class GhostController : MonoBehaviour
                 originalMaterial = zeroFrictionMaterial;
             }
         }
-        
-        // Set up visual appearance
+
         spriteRenderer = GetComponent<SpriteRenderer>();
         if (spriteRenderer != null)
         {
@@ -82,112 +83,148 @@ public class GhostController : MonoBehaviour
             spriteRenderer.sortingLayerName = sortingLayerName;
             spriteRenderer.sortingOrder = sortingOrder;
         }
-        
-        // Set up collider for physics mode - EXACTLY like the player
+
         BoxCollider2D ghostCollider = GetComponent<BoxCollider2D>();
         if (ghostCollider != null)
         {
-            // Make it solid so it can interact with the real world
             ghostCollider.isTrigger = false;
-            ghostCollider.density = 1f; // Same as player
-            ghostCollider.usedByEffector = false; // Same as player
-            ghostCollider.usedByComposite = false; // Same as player
-            ghostCollider.offset = Vector2.zero; // Same as player
+            ghostCollider.density = 1f;
+            ghostCollider.usedByEffector = false;
+            ghostCollider.usedByComposite = false;
+            ghostCollider.offset = Vector2.zero;
         }
-        
-        // Ensure ghost is on Ghost layer
+
         gameObject.layer = LayerMask.NameToLayer("Ghost");
-        
-        // Set ground layer mask to detect Default and Ground layers
         groundLayer = LayerMask.GetMask("Default", "Ground");
-        
-        // Set initial position
+        pushableLayer = LayerMask.GetMask("Moveable Blocks");
+
         if (recordedActions.Length > 0)
         {
             transform.position = recordedActions[0].position;
         }
     }
-    
+
     public void RestartReplay()
     {
-        // Reset replay state
         ghostStartTime = Time.time;
         currentActionIndex = 0;
         isReplaying = true;
         hasJumped = false;
-        
-        // Reset rigidbody
+        blockPushTimer = 0f; // Reset the timer
+
         if (rb != null)
         {
-            rb.isKinematic = false; // Make it dynamic again
+            rb.isKinematic = false;
             rb.velocity = Vector2.zero;
         }
-        
-        // Reset collider to trigger mode for replay
+
         BoxCollider2D ghostCollider = GetComponent<BoxCollider2D>();
         if (ghostCollider != null)
         {
-            ghostCollider.isTrigger = false; // Keep solid for real world interaction
+            ghostCollider.isTrigger = false;
         }
-        
-        // Restore original physics material
+
         if (rb != null && originalMaterial != null)
         {
             rb.sharedMaterial = originalMaterial;
         }
-        
-        // Reset visual appearance
+
         if (spriteRenderer != null)
         {
             spriteRenderer.color = ghostColor;
         }
-        
-        // Set to initial position
+
         if (recordedActions.Length > 0)
         {
             transform.position = recordedActions[0].position;
         }
     }
-    
+
     private void Update()
     {
         if (!isReplaying)
         {
-            // Ghost has finished replaying, just stay frozen
             return;
         }
-        
-        // Check if grounded
+
         CheckGrounded();
-        
-        // Reset jump when grounded
+
         if (isGrounded)
         {
             hasJumped = false;
         }
-        
+
         if (recordedActions == null || recordedActions.Length == 0 || currentActionIndex >= recordedActions.Length)
         {
-            // Ghost has finished replaying, freeze in place
             FreezeGhost();
             return;
         }
-        
+
         float currentTime = Time.time - ghostStartTime;
         PlayerController.PlayerAction currentAction = recordedActions[currentActionIndex];
-        
-        // Check if it's time for the next action
+
         if (currentTime >= currentAction.timestamp)
         {
-            // Apply the recorded action
             ApplyAction(currentAction);
             currentActionIndex++;
         }
-        
-        // Update visual appearance
+
         UpdateVisualAppearance();
+
+        // Always count down the timer
+        if (blockPushTimer > 0f)
+        {
+            blockPushTimer -= Time.deltaTime;
+        }
     }
-    
+
+    private void ApplyAction(PlayerController.PlayerAction action)
+    {
+        if (rb != null)
+        {
+            Vector2 velocity = rb.velocity;
+            velocity.x = action.horizontalInput * moveSpeed;
+            rb.velocity = velocity;
+
+            if (action.jumpPressed && isGrounded && !hasJumped)
+            {
+                rb.AddForce(Vector2.up * jumpForce, ForceMode2D.Impulse);
+                hasJumped = true;
+            }
+
+            // --- GHOST BLOCK PUSHING LOGIC ---
+            // Replicate the block pushing logic from PlayerController
+            if (action.horizontalInput != 0 && blockPushTimer <= 0f)
+            {
+                Vector2 direction = new Vector2(Mathf.Sign(action.horizontalInput), 0);
+                Vector2 boxOrigin = (Vector2)transform.position;
+                Vector2 boxSize = new Vector2(0.3f, 0.9f);
+
+                RaycastHit2D hit = Physics2D.BoxCast(
+                    boxOrigin,
+                    boxSize,
+                    0f,
+                    direction,
+                    pushDistance,
+                    pushableLayer
+                );
+
+                if (hit.collider != null)
+                {
+                    PushableBlock block = hit.collider.GetComponent<PushableBlock>();
+                    if (block != null)
+                    {
+                        // A ghost should be able to push a block
+                        if (block.TryMove(direction))
+                        {
+                            blockPushTimer = blockPushCooldown;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     private void CheckGrounded()
     {
         // Get the ghost's collider to find the bottom position
@@ -204,26 +241,6 @@ public class GhostController : MonoBehaviour
         
         // Debug visualization
         Debug.DrawRay(bottomCenter, Vector2.down * groundCheckDistance, isGrounded ? Color.green : Color.red);
-    }
-    
-    private void ApplyAction(PlayerController.PlayerAction action)
-    {
-        // Use velocity-based movement instead of forces for better control
-        if (rb != null)
-        {
-            // Set horizontal velocity directly (like the player does)
-            Vector2 velocity = rb.velocity;
-            velocity.x = action.horizontalInput * moveSpeed; // Same speed as player
-            rb.velocity = velocity;
-            
-            // Handle jump if it was pressed and ghost is actually grounded (not just recorded as grounded)
-            if (action.jumpPressed && isGrounded && !hasJumped)
-            {
-                // Apply jump force (same as player)
-                rb.AddForce(Vector2.up * jumpForce, ForceMode2D.Impulse);
-                hasJumped = true;
-            }
-        }
     }
     
     private void FreezeGhost()
