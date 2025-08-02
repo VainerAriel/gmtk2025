@@ -19,6 +19,8 @@ public class GhostController : MonoBehaviour
     [SerializeField] private Color ghostColor = new Color(1f, 1f, 1f, 0.5f);
     [SerializeField] private LayerMask groundLayer = 1 | (1 << 8); // Default layer + Ground layer
     [SerializeField] private float groundCheckDistance = 0.1f;
+    [SerializeField] private string sortingLayerName = "Player"; // Sorting layer for visual rendering
+    [SerializeField] private int sortingOrder = 0; // Order within the sorting layer
     
     private PhysicsMaterial2D originalMaterial;
     
@@ -77,6 +79,8 @@ public class GhostController : MonoBehaviour
         if (spriteRenderer != null)
         {
             spriteRenderer.color = ghostColor;
+            spriteRenderer.sortingLayerName = sortingLayerName;
+            spriteRenderer.sortingOrder = sortingOrder;
         }
         
         // Set up collider for physics mode - EXACTLY like the player

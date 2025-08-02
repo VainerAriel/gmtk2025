@@ -14,7 +14,7 @@ TagManager:
   - Player
   - Ghost
   - Ground
-  - 
+  - BG
   - 
   - 
   - 
@@ -40,4 +40,19 @@ TagManager:
   m_SortingLayers:
   - name: Default
     uniqueID: 0
+    locked: 0
+  - name: BG
+    uniqueID: 406282791
+    locked: 0
+  - name: Ground
+    uniqueID: 349612151
+    locked: 0
+  - name: Player
+    uniqueID: 258913773
+    locked: 0
+  - name: Ghost
+    uniqueID: 3059979363
+    locked: 0
+  - name: UI
+    uniqueID: 4198375109
     locked: 0

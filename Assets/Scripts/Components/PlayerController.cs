@@ -15,6 +15,12 @@ public class PlayerController : MonoBehaviour
     [SerializeField] private float maxHealth = 100f;
     [SerializeField] private float currentHealth;
     
+    [Header("Death Boundary")]
+    [SerializeField] private float deathYThreshold = -10f;
+    [SerializeField] private bool useTileBasedDeath = true;
+    [SerializeField] private float tileSize = 1f; // Size of one tile in world units
+    [SerializeField] private int tilesBelowPlatform = 10; // Number of tiles below platform to trigger death
+    
     [Header("Ghost System")]
     [SerializeField] private int maxGhosts = 3;
     [SerializeField] private Vector3 startPosition = new Vector3(-3.38f, -2.55f, 0f);
@@ -106,6 +112,9 @@ public class PlayerController : MonoBehaviour
         {
             RecordAction(horizontalInput, jumpPressed);
         }
+        
+        // Check for death boundary
+        CheckDeathBoundary();
     }
     
     private void RecordAction(float horizontalInput, bool jumpPressed)
@@ -237,7 +246,9 @@ public class PlayerController : MonoBehaviour
         currentHealth -= damage;
         if (currentHealth <= 0)
         {
-            Destroy(gameObject);
+            // Automatic respawn when health reaches zero
+            RespawnPlayer();
+            currentHealth = maxHealth;
         }
     }
     
@@ -249,5 +260,29 @@ public class PlayerController : MonoBehaviour
     public float GetMaxHealth()
     {
         return maxHealth;
+    }
+    
+    private void CheckDeathBoundary()
+    {
+        float deathThreshold;
+        
+        if (useTileBasedDeath)
+        {
+            // Calculate death threshold based on tile size and number of tiles below platform
+            deathThreshold = -(tilesBelowPlatform * tileSize);
+        }
+        else
+        {
+            // Use the original world unit threshold
+            deathThreshold = deathYThreshold;
+        }
+        
+        // Check if player has fallen below the death threshold
+        if (transform.position.y < deathThreshold)
+        {
+            // Trigger automatic respawn when falling off the platform
+            RespawnPlayer();
+            currentHealth = maxHealth;
+        }
     }
 } 
