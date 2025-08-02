@@ -240,6 +240,17 @@ public class GhostController : MonoBehaviour
                 animator.SetBool("isPushing", action.isPushingAnim);
             }
         }
+
+        // --- GHOST SPRITE FLIPPING LOGIC ---
+        // The player's sprite flipping logic checks horizontalInput. We do the same.
+        if (action.horizontalInput > 0)
+        {
+            transform.localScale = new Vector3(1, transform.localScale.y, transform.localScale.z); // Face right
+        }
+        else if (action.horizontalInput < 0)
+        {
+            transform.localScale = new Vector3(-1, transform.localScale.y, transform.localScale.z); // Face left
+        }
     }
 
     private void CheckGrounded()
