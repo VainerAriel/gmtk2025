@@ -107,9 +107,12 @@ public class PlayerController : MonoBehaviour
 
         // Animation inputs
         animator.SetFloat("xVelocity", System.Math.Abs(rb.velocity.x));
+        animator.SetFloat("yVelocity", rb.velocity.y);
 
         // Check if grounded
         CheckGrounded();
+
+        animator.SetBool("isJumping", !isGrounded);
 
         // Reset jump when grounded
         if (isGrounded)
