@@ -41,7 +41,6 @@ public class MovingPlatform : MonoBehaviour
     {
         if (collision.gameObject.CompareTag("Player") && player.CheckGrounded())
         {
-            Debug.Log("on platform");
             collision.gameObject.transform.parent = transform;
         }
     }
