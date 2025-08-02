@@ -42,6 +42,10 @@ public class PlayerController : MonoBehaviour
     private float blockPushCooldown = 0.2f;
     private float blockPushTimer = 0f;
 
+    // Animation push state variables
+    private float pushAnimHoldTime = 0.15f; // seconds to keep anim after losing contact
+    private float pushAnimTimer = 0f;
+
     Animator animator;
     
     // Ghost system variables
@@ -106,12 +110,11 @@ public class PlayerController : MonoBehaviour
         rb.velocity = velocity;
 
         // Animation inputs
-        animator.SetFloat("xVelocity", System.Math.Abs(rb.velocity.x));
+        animator.SetFloat("xVelocity", Mathf.Abs(rb.velocity.x));
         animator.SetFloat("yVelocity", rb.velocity.y);
 
         // Check if grounded
         CheckGrounded();
-
         animator.SetBool("isJumping", !isGrounded);
 
         // Reset jump when grounded
@@ -139,27 +142,22 @@ public class PlayerController : MonoBehaviour
 
         // Flip character sprite based on movement direction
         if (horizontalInput > 0)
-        {
-            transform.localScale = new Vector3(1, transform.localScale.y, transform.localScale.z); // Face right
-        }
+            transform.localScale = new Vector3(1, transform.localScale.y, transform.localScale.z);
         else if (horizontalInput < 0)
-        {
-            transform.localScale = new Vector3(-1, transform.localScale.y, transform.localScale.z); // Face left
-        }
+            transform.localScale = new Vector3(-1, transform.localScale.y, transform.localScale.z);
 
         // Always count down timer, regardless of input
         if (blockPushTimer > 0f)
-        {
             blockPushTimer -= Time.deltaTime;
-        }
 
-        // Pushable blocks logic
-        if (horizontalInput != 0 && blockPushTimer <= 0f)
+        // --- PUSHING LOGIC ---
+        bool touchingPushable = false;
+
+        if (horizontalInput != 0)
         {
             Vector2 direction = new Vector2(Mathf.Sign(horizontalInput), 0);
-
-            Vector2 boxOrigin = (Vector2)transform.position;  // Use transform.position or offset slightly if needed
-            Vector2 boxSize = new Vector2(0.3f, 0.9f);         // Thin vertical strip for horizontal push
+            Vector2 boxOrigin = (Vector2)transform.position;
+            Vector2 boxSize = new Vector2(0.3f, 0.9f);
 
             RaycastHit2D hit = Physics2D.BoxCast(
                 boxOrigin,
@@ -170,21 +168,32 @@ public class PlayerController : MonoBehaviour
                 pushableLayer
             );
 
-            Debug.DrawRay(boxOrigin, direction * pushDistance, Color.red); // Visualize raycast in Scene view
+            Debug.DrawRay(boxOrigin, direction * pushDistance, Color.red);
 
             if (hit.collider != null)
             {
                 PushableBlock block = hit.collider.GetComponent<PushableBlock>();
                 if (block != null)
                 {
-                    if (block.TryMove(direction))
+                    touchingPushable = true;
+
+                    // Move block only when cooldown allows
+                    if (blockPushTimer <= 0f)
                     {
-                        blockPushTimer = blockPushCooldown;
+                        if (block.TryMove(direction))
+                            blockPushTimer = blockPushCooldown;
                     }
                 }
             }
         }
-        
+
+        // --- PUSH ANIMATION BUFFER ---
+        if (touchingPushable && horizontalInput != 0)
+            pushAnimTimer = pushAnimHoldTime; // refresh hold timer
+        else
+            pushAnimTimer -= Time.deltaTime;
+
+        animator.SetBool("isPushing", pushAnimTimer > 0f);
     }
 
     private void RecordAction(float horizontalInput, bool jumpPressed)

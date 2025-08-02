@@ -6,7 +6,7 @@ public class PushableBlock : MonoBehaviour
     public LayerMask obstacleLayer; // Layer for tilemap with obstacles
     [SerializeField] private float moveSpeed = 5f;
 
-    private bool isMoving = false;
+    public bool isMoving = false;
     private Vector3 originalPosition; // New variable to store the initial position
 
     public float fallSpeed = 2f;
@@ -43,9 +43,6 @@ public class PushableBlock : MonoBehaviour
         Vector2 boxCenter = (Vector2)transform.position + Vector2.down * 0.51f; // just below
         Vector2 boxSize = new Vector2(0.8f, 0.1f); // wide and shallow box
         Collider2D hit = Physics2D.OverlapBox(boxCenter, boxSize, 0f, obstacleLayer);
-
-        Debug.DrawLine(boxCenter + Vector2.left * 0.4f, boxCenter + Vector2.right * 0.4f, Color.red, 0.1f);
-        Debug.Log($"IsGrounded: {hit != null} at position {transform.position}");
 
         return hit != null;
     }
@@ -115,7 +112,6 @@ public class PushableBlock : MonoBehaviour
         }
 
         transform.position = targetPos; // Final snap to avoid tiny offsets
-        Debug.Log($"Block moved to {targetPos}");
         isMoving = false;
     }
 
