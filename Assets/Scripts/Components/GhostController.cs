@@ -23,6 +23,7 @@ public class GhostController : MonoBehaviour
 
     private Animator animator;
 
+
     [Header("Ghost Settings")]
     [SerializeField] private float ghostAlpha = 0.5f;
     [SerializeField] private Color ghostColor = new Color(1f, 1f, 1f, 0.5f);
@@ -44,6 +45,14 @@ public class GhostController : MonoBehaviour
         isReplaying = true;
         hasJumped = false;
 
+        BoxCollider2D ghostCollider = GetComponent<BoxCollider2D>();
+        BoxCollider2D playerCollider = FindObjectOfType<PlayerController>().GetComponent<BoxCollider2D>();
+
+        if (ghostCollider != null && playerCollider != null)
+        {
+            ghostCollider.size = playerCollider.size;
+            ghostCollider.offset = playerCollider.offset;
+        }
 
         rb = GetComponent<Rigidbody2D>();
         if (rb == null)
@@ -93,14 +102,12 @@ public class GhostController : MonoBehaviour
             spriteRenderer.sortingOrder = sortingOrder;
         }
 
-        BoxCollider2D ghostCollider = GetComponent<BoxCollider2D>();
         if (ghostCollider != null)
         {
             ghostCollider.isTrigger = false;
             ghostCollider.density = 1f;
             ghostCollider.usedByEffector = false;
             ghostCollider.usedByComposite = false;
-            ghostCollider.offset = Vector2.zero;
         }
 
         gameObject.layer = LayerMask.NameToLayer("Ghost");
