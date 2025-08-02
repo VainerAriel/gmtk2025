@@ -18,8 +18,8 @@ TagManager:
   - BG
   - Projectile
   - Reflect
-  - 
-  - 
+  - Projectile_Shooter
+  - Spike
   - 
   - 
   - 
@@ -47,6 +47,9 @@ TagManager:
     locked: 0
   - name: Projectiles
     uniqueID: 293057827
+    locked: 0
+  - name: Spikes
+    uniqueID: 1426605441
     locked: 0
   - name: Ground
     uniqueID: 349612151
