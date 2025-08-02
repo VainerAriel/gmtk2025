@@ -6,6 +6,8 @@ public class PushableBlock : MonoBehaviour
 
     public bool TryMove(Vector2 dir)
     {
+        if (!CanMove(dir)) return false; // Blocked
+
         Vector3 targetPos = transform.position + (Vector3)dir;
 
         targetPos.x = Mathf.Round(targetPos.x - 0.5f) + 0.5f;
@@ -20,4 +22,11 @@ public class PushableBlock : MonoBehaviour
         }
         return false;
     }
+
+    bool CanMove(Vector2 direction)
+    {
+        RaycastHit2D hit = Physics2D.Raycast(transform.position, direction, 1f, obstacleLayer);
+        return hit.collider == null;
+    }
+
 }
