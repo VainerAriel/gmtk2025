@@ -3,7 +3,8 @@
 --- !u!78 &1
 TagManager:
   serializedVersion: 2
-  tags: []
+  tags:
+  - reflect_block_placeholder
   layers:
   - Default
   - TransparentFX
@@ -15,8 +16,8 @@ TagManager:
   - Ghost
   - Ground
   - BG
-  - 
-  - 
+  - Projectile
+  - Reflect
   - 
   - 
   - 
@@ -43,6 +44,9 @@ TagManager:
     locked: 0
   - name: BG
     uniqueID: 406282791
+    locked: 0
+  - name: Projectiles
+    uniqueID: 293057827
     locked: 0
   - name: Ground
     uniqueID: 349612151

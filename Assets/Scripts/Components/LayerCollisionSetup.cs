@@ -20,6 +20,8 @@ public class LayerCollisionSetup : MonoBehaviour
         int ghostLayer = LayerMask.NameToLayer("Ghost");
         int defaultLayer = LayerMask.NameToLayer("Default");
         int groundLayer = LayerMask.NameToLayer("Ground");
+        int projectileLayer = LayerMask.NameToLayer("Projectile");
+        int reflectLayer = LayerMask.NameToLayer("Reflect");
         
         // Disable collision between Player and Ghost layers
         if (playerLayer != -1 && ghostLayer != -1)
@@ -54,6 +56,21 @@ public class LayerCollisionSetup : MonoBehaviour
         if (ghostLayer != -1 && groundLayer != -1)
         {
             Physics2D.IgnoreLayerCollision(ghostLayer, groundLayer, false);
+        }
+        
+        // Setup projectile layer collisions
+        if (projectileLayer != -1)
+        {
+            // Projectiles collide with ground, reflect blocks, and player
+            Physics2D.IgnoreLayerCollision(projectileLayer, defaultLayer, false);
+            Physics2D.IgnoreLayerCollision(projectileLayer, groundLayer, false);
+            Physics2D.IgnoreLayerCollision(projectileLayer, reflectLayer, false);
+            Physics2D.IgnoreLayerCollision(projectileLayer, playerLayer, false);
+            
+            // Projectiles don't collide with ghosts
+            Physics2D.IgnoreLayerCollision(projectileLayer, ghostLayer, true);
+            
+            Debug.Log($"Setup projectile layer ({projectileLayer}) collisions");
         }
         
         Debug.Log("Layer collision setup complete!");
