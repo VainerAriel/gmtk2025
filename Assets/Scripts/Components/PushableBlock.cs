@@ -7,6 +7,13 @@ public class PushableBlock : MonoBehaviour
     [SerializeField] private float moveSpeed = 5f;
 
     private bool isMoving = false;
+    private Vector3 originalPosition; // New variable to store the initial position
+
+    void Start()
+    {
+        // Store the block's initial position
+        originalPosition = transform.position;
+    }
 
     public bool TryMove(Vector2 dir)
     {
@@ -48,5 +55,11 @@ public class PushableBlock : MonoBehaviour
     {
         RaycastHit2D hit = Physics2D.Raycast(transform.position, direction, 1f, obstacleLayer);
         return hit.collider == null;
+    }
+
+    // Public method to reset the block's position
+    public void ResetPosition()
+    {
+        transform.position = originalPosition;
     }
 }

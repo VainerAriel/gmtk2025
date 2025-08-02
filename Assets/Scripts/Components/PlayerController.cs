@@ -211,7 +211,10 @@ public class PlayerController : MonoBehaviour
         
         // Restart all active ghosts
         RestartAllGhosts();
-        
+
+        // Find all PushableBlock objects in the scene and reset their positions
+        ResetAllPushableBlocks();
+
         // Reset player position and state
         transform.position = startPosition;
         rb.velocity = Vector2.zero;
@@ -288,7 +291,20 @@ public class PlayerController : MonoBehaviour
         ghostController.Initialize(recordedActions.ToArray(), allowGhostPhysicsAfterFreeze, moveSpeed, jumpForce, rb.sharedMaterial);
         activeGhosts.Add(ghostController);
     }
-    
+
+    // New method to reset all pushable blocks
+    private void ResetAllPushableBlocks()
+    {
+        // Find all active PushableBlock components in the scene
+        PushableBlock[] allBlocks = FindObjectsOfType<PushableBlock>();
+
+        // Iterate through each block and call the ResetPosition method
+        foreach (PushableBlock block in allBlocks)
+        {
+            block.ResetPosition();
+        }
+    }
+
     private void CheckGrounded()
     {
         // Get the player's collider to find the bottom position
