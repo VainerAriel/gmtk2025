@@ -9,15 +9,83 @@ public class PushableBlock : MonoBehaviour
     private bool isMoving = false;
     private Vector3 originalPosition; // New variable to store the initial position
 
+    public float fallSpeed = 2f;
+    public float checkDistance = 0.1f;
+
+    private bool isFalling = false;
+    private Vector3 targetPosition;
+
+    private float fallStartX;
+
     void Start()
     {
         // Store the block's initial position
         originalPosition = transform.position;
     }
 
+    void Update()
+    {
+        if (!isFalling)
+        {
+            if (!IsGrounded())
+            {
+                StartFalling();
+            }
+        }
+        else
+        {
+            FallStep();
+        }
+    }
+
+    bool IsGrounded()
+    {
+        Vector2 boxCenter = (Vector2)transform.position + Vector2.down * 0.51f; // just below
+        Vector2 boxSize = new Vector2(0.8f, 0.1f); // wide and shallow box
+        Collider2D hit = Physics2D.OverlapBox(boxCenter, boxSize, 0f, obstacleLayer);
+
+        Debug.DrawLine(boxCenter + Vector2.left * 0.4f, boxCenter + Vector2.right * 0.4f, Color.red, 0.1f);
+        Debug.Log($"IsGrounded: {hit != null} at position {transform.position}");
+
+        return hit != null;
+    }
+
+    void StartFalling()
+    {
+        isFalling = true;
+        fallStartX = transform.position.x; // lock in x-position
+        targetPosition = transform.position + Vector3.down; // one grid unit down
+    }
+
+    void FallStep()
+    {
+        // Move down while keeping X constant
+        Vector3 nextPos = new Vector3(fallStartX, transform.position.y - fallSpeed * Time.deltaTime, 0);
+        transform.position = Vector3.MoveTowards(transform.position, nextPos, fallSpeed * Time.deltaTime);
+
+        // If reached target cell
+        if (Vector3.Distance(transform.position, targetPosition) < 0.01f)
+        {
+            if (!IsGrounded())
+            {
+                targetPosition += Vector3.down; // queue another step
+            }
+            else
+            {
+                // Snap to grid to avoid floating point imprecision
+                Vector3 pos = transform.position;
+                pos.x = Mathf.Round(pos.x - 0.5f) + 0.5f;
+                pos.y = Mathf.Round(pos.y - 0.5f) + 0.5f;
+                transform.position = pos;
+
+                isFalling = false;
+            }
+        }
+    }
+
     public bool TryMove(Vector2 dir)
     {
-        if (isMoving || !CanMove(dir)) return false;
+        if (isMoving || isFalling || !CanMove(dir)) return false;
 
         Vector3 targetPos = transform.position + (Vector3)dir;
 
