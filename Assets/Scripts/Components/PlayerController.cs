@@ -39,6 +39,7 @@ public class PlayerController : MonoBehaviour
     // Ghost system variables
     private List<PlayerAction> recordedActions = new List<PlayerAction>();
     private List<GhostController> activeGhosts = new List<GhostController>();
+    private List<PlayerAction[]> ghostMemories = new List<PlayerAction[]>(); // Store memories for each ghost
     private float gameStartTime;
     private bool isRecording = true;
     
@@ -157,6 +158,9 @@ public class PlayerController : MonoBehaviour
         // Stop recording current session
         isRecording = false;
         
+        // Reset everything when player dies
+        ResetGameState();
+        
         // Create ghost from recorded actions
         if (recordedActions.Count > 0)
         {
@@ -178,19 +182,142 @@ public class PlayerController : MonoBehaviour
         isRecording = true;
     }
     
-    private void RestartAllGhosts()
+    /// <summary>
+    /// Resets the entire game state when player dies
+    /// </summary>
+    private void ResetGameState()
     {
+        // Clear all reflectors
+        if (ReflectorManager.Instance != null)
+        {
+            ReflectorManager.Instance.ClearAllReflectors();
+        }
+        
+        // Clear all bullets from the screen
+        Projectile[] allProjectiles = FindObjectsOfType<Projectile>();
+        foreach (Projectile projectile in allProjectiles)
+        {
+            if (projectile != null)
+            {
+                Destroy(projectile.gameObject);
+            }
+        }
+        
+        // Reset all projectile shooters
+        ProjectileShooter[] projectileShooters = FindObjectsOfType<ProjectileShooter>();
+        foreach (ProjectileShooter shooter in projectileShooters)
+        {
+            if (shooter != null)
+            {
+                shooter.ResetTimer();
+            }
+        }
+        
+        // Reset all tilemap projectile shooters
+        TilemapProjectileShooter[] tilemapShooters = FindObjectsOfType<TilemapProjectileShooter>();
+        foreach (TilemapProjectileShooter shooter in tilemapShooters)
+        {
+            if (shooter != null)
+            {
+                shooter.ResetTimer();
+            }
+        }
+        
+        // Reset all spike timers
+        SpikeTile[] allSpikes = FindObjectsOfType<SpikeTile>();
+        foreach (SpikeTile spike in allSpikes)
+        {
+            if (spike != null)
+            {
+                spike.RestartCycle();
+            }
+        }
+        
+        // Reset all ghosts' electricity hit state
         foreach (GhostController ghost in activeGhosts)
         {
             if (ghost != null)
             {
-                ghost.RestartReplay();
+                ghost.ResetElectricityHitState();
+            }
+        }
+        
+        Debug.Log($"[PlayerController] Game state reset - Cleared reflectors, destroyed {allProjectiles.Length} bullets, reset {projectileShooters.Length} projectile shooters, {tilemapShooters.Length} tilemap shooters, reset {allSpikes.Length} spikes, and reset {activeGhosts.Count} ghosts");
+    }
+    
+    private void RestartAllGhosts()
+    {
+        // Clear existing ghosts
+        foreach (GhostController ghost in activeGhosts)
+        {
+            if (ghost != null)
+            {
+                Destroy(ghost.gameObject);
+            }
+        }
+        activeGhosts.Clear();
+        
+        // Recreate ghosts with their stored memories
+        for (int i = 0; i < ghostMemories.Count; i++)
+        {
+            if (i < ghostMemories.Count)
+            {
+                CreateGhostFromMemory(ghostMemories[i], i);
             }
         }
     }
     
+    private void CreateGhostFromMemory(PlayerAction[] memory, int memoryIndex)
+    {
+        // Create ghost object
+        GameObject ghostObject;
+        if (ghostPrefab != null)
+        {
+            ghostObject = Instantiate(ghostPrefab, startPosition, Quaternion.identity);
+        }
+        else
+        {
+            // Create a simple ghost if no prefab is assigned
+            ghostObject = new GameObject("Ghost");
+            ghostObject.transform.position = startPosition;
+            
+            // Add sprite renderer with ghost appearance
+            SpriteRenderer ghostRenderer = ghostObject.AddComponent<SpriteRenderer>();
+            SpriteRenderer playerRenderer = GetComponent<SpriteRenderer>();
+            if (playerRenderer != null && playerRenderer.sprite != null)
+            {
+                ghostRenderer.sprite = playerRenderer.sprite;
+                ghostRenderer.color = new Color(1f, 1f, 1f, 0.5f); // Semi-transparent
+            }
+            
+            // Add collider (non-trigger for visual purposes)
+            BoxCollider2D ghostCollider = ghostObject.AddComponent<BoxCollider2D>();
+            BoxCollider2D playerCollider = GetComponent<BoxCollider2D>();
+            if (playerCollider != null)
+            {
+                ghostCollider.size = playerCollider.size;
+                ghostCollider.offset = playerCollider.offset;
+            }
+            ghostCollider.isTrigger = true; // Make it non-solid
+        }
+        
+        // Set ghost to Ghost layer
+        ghostObject.layer = LayerMask.NameToLayer("Ghost");
+        
+        // Add ghost controller with the stored memory
+        GhostController ghostController = ghostObject.AddComponent<GhostController>();
+        ghostController.Initialize(memory, allowGhostPhysicsAfterFreeze, moveSpeed, jumpForce, rb.sharedMaterial);
+        activeGhosts.Add(ghostController);
+        
+        Debug.Log($"[PlayerController] Recreated ghost {memoryIndex} with {memory.Length} recorded actions");
+    }
+    
     private void CreateGhost()
     {
+        // Store the current recorded actions as a memory for this ghost
+        PlayerAction[] ghostMemory = recordedActions.ToArray();
+        ghostMemories.Add(ghostMemory);
+        
         // Remove oldest ghost if at max capacity (FIFO)
         if (activeGhosts.Count >= maxGhosts)
         {
@@ -199,6 +326,12 @@ public class PlayerController : MonoBehaviour
             if (oldestGhost != null)
             {
                 Destroy(oldestGhost.gameObject);
+            }
+            
+            // Also remove the oldest memory
+            if (ghostMemories.Count > 0)
+            {
+                ghostMemories.RemoveAt(0);
             }
         }
         
@@ -239,7 +372,7 @@ public class PlayerController : MonoBehaviour
         
         // Add ghost controller
         GhostController ghostController = ghostObject.AddComponent<GhostController>();
-        ghostController.Initialize(recordedActions.ToArray(), allowGhostPhysicsAfterFreeze, moveSpeed, jumpForce, rb.sharedMaterial);
+        ghostController.Initialize(ghostMemory, allowGhostPhysicsAfterFreeze, moveSpeed, jumpForce, rb.sharedMaterial);
         activeGhosts.Add(ghostController);
     }
     

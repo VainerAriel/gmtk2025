@@ -27,6 +27,9 @@ public class ProjectileShooter : MonoBehaviour
             audioSource = gameObject.AddComponent<AudioSource>();
         }
         
+        // Ensure the shooter has collision components
+        SetupCollision();
+        
         // Set initial rotation based on shoot angle
         if (rotateEmitter)
         {
@@ -40,6 +43,40 @@ public class ProjectileShooter : MonoBehaviour
         else
         {
             nextShootTime = Time.time + shootInterval;
+        }
+    }
+    
+    /// <summary>
+    /// Ensures the shooter has proper collision components to act as a solid block
+    /// </summary>
+    private void SetupCollision()
+    {
+        // Add BoxCollider2D if it doesn't exist
+        BoxCollider2D boxCollider = GetComponent<BoxCollider2D>();
+        if (boxCollider == null)
+        {
+            boxCollider = gameObject.AddComponent<BoxCollider2D>();
+            // Set default size to 1x1 tile
+            boxCollider.size = Vector2.one;
+            boxCollider.offset = Vector2.zero;
+        }
+        
+        // Ensure it's not a trigger (should be solid)
+        boxCollider.isTrigger = false;
+        
+        // Add Rigidbody2D if it doesn't exist (for static collision)
+        Rigidbody2D rb = GetComponent<Rigidbody2D>();
+        if (rb == null)
+        {
+            rb = gameObject.AddComponent<Rigidbody2D>();
+            rb.bodyType = RigidbodyType2D.Static; // Static so it doesn't move
+            rb.simulated = true; // Enable physics simulation
+        }
+        
+        // Ensure it's on the Ground layer for proper collision
+        if (gameObject.layer != LayerMask.NameToLayer("Ground"))
+        {
+            gameObject.layer = LayerMask.NameToLayer("Ground");
         }
     }
     
@@ -65,7 +102,7 @@ public class ProjectileShooter : MonoBehaviour
         
         if (projectile != null)
         {
-            projectile.Initialize(direction, projectileSpeed);
+            projectile.Initialize(direction, projectileSpeed, gameObject);
         }
         
         // Visual and audio effects
@@ -113,6 +150,15 @@ public class ProjectileShooter : MonoBehaviour
         {
             UpdateEmitterRotation();
         }
+    }
+    
+    /// <summary>
+    /// Reset the shooting timer to start counting from now
+    /// </summary>
+    public void ResetTimer()
+    {
+        nextShootTime = Time.time + shootInterval;
+        Debug.Log($"[ProjectileShooter] Timer reset for {gameObject.name}");
     }
     
     /// <summary>

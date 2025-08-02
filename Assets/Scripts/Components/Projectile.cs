@@ -7,7 +7,7 @@ public class Projectile : MonoBehaviour
     [SerializeField] private float defaultSpeed = 8f; // Default speed if not set by shooter
     [SerializeField] private float damage = 999f; // High damage for instant death
     [SerializeField] private float maxDistance = 50f;
-    [SerializeField] private LayerMask collisionLayers = -1;
+    [SerializeField] private LayerMask collisionLayers = -1; // Will be set to exclude Ground layer
     [SerializeField] private LayerMask reflectLayers = -1;
     
     [Header("Visual Effects")]
@@ -24,6 +24,7 @@ public class Projectile : MonoBehaviour
     private int currentBounces = 0;
     private float speed; // Current speed of this projectile
     private HashSet<ReflectBlock> hitReflectBlocks = new HashSet<ReflectBlock>(); // Track which reflect blocks we've hit
+    private GameObject shooter; // Reference to the shooter that created this projectile
     
     private Rigidbody2D rb;
     private SpriteRenderer spriteRenderer;
@@ -34,14 +35,52 @@ public class Projectile : MonoBehaviour
         spriteRenderer = GetComponent<SpriteRenderer>();
         startPosition = transform.position;
         speed = defaultSpeed; // Set default speed
+        
+        // Set up collision layers to exclude Ground layer (where shooters are)
+        SetupCollisionLayers();
     }
     
-    public void Initialize(Vector2 shootDirection, float projectileSpeed = -1f)
+    /// <summary>
+    /// Sets up collision layers to prevent projectiles from hitting their own shooters but allow ground collision
+    /// </summary>
+    private void SetupCollisionLayers()
+    {
+        // Include Ground layer for collision (so bullets can hit ground and get destroyed)
+        int groundLayer = LayerMask.NameToLayer("Ground");
+        if (groundLayer != -1)
+        {
+            collisionLayers = collisionLayers | (1 << groundLayer);
+        }
+        
+        // Set the projectile to the Projectile layer if it exists
+        int projectileLayer = LayerMask.NameToLayer("Projectile");
+        if (projectileLayer != -1)
+        {
+            gameObject.layer = projectileLayer;
+        }
+        
+        if (debugMode)
+        {
+            Debug.Log($"[Projectile] Collision layers set to: {collisionLayers.value}, Layer: {LayerMask.LayerToName(gameObject.layer)}");
+        }
+    }
+    
+    /// <summary>
+    /// Get the current direction of the projectile
+    /// </summary>
+    /// <returns>The normalized direction vector</returns>
+    public Vector2 GetDirection()
+    {
+        return direction;
+    }
+    
+    public void Initialize(Vector2 shootDirection, float projectileSpeed = -1f, GameObject shooter = null)
     {
         direction = shootDirection.normalized;
         distanceTraveled = 0f;
         currentBounces = 0;
         hitReflectBlocks.Clear(); // Clear the list of hit reflect blocks
+        this.shooter = shooter; // Store reference to the shooter
         
         // Use provided speed or default
         if (projectileSpeed > 0)
@@ -58,7 +97,7 @@ public class Projectile : MonoBehaviour
         
         if (debugMode)
         {
-            Debug.Log($"[Projectile] Initialized with direction: {direction}, speed: {speed}");
+            Debug.Log($"[Projectile] Initialized with direction: {direction}, speed: {speed}, shooter: {(shooter != null ? shooter.name : "null")}");
         }
     }
     
@@ -102,6 +141,28 @@ public class Projectile : MonoBehaviour
         if (debugMode)
         {
             Debug.Log($"[Projectile] Handling collision with: {hit.collider.name}");
+        }
+        
+        // Ignore collision with the shooter that created this projectile
+        if (shooter != null && hit.collider.gameObject == shooter)
+        {
+            if (debugMode)
+            {
+                Debug.Log($"[Projectile] Ignoring collision with own shooter: {shooter.name}");
+            }
+            return;
+        }
+        
+        // Ignore collision with any shooter (ProjectileShooter or TilemapProjectileShooter components)
+        ProjectileShooter projectileShooter = hit.collider.GetComponent<ProjectileShooter>();
+        TilemapProjectileShooter tilemapShooter = hit.collider.GetComponent<TilemapProjectileShooter>();
+        if (projectileShooter != null || tilemapShooter != null)
+        {
+            if (debugMode)
+            {
+                Debug.Log($"[Projectile] Ignoring collision with shooter: {hit.collider.name}");
+            }
+            return;
         }
         
         // Check if it's a reflect block
@@ -157,7 +218,23 @@ public class Projectile : MonoBehaviour
             return;
         }
         
-        // Regular collision with ground/wall
+        // Check if it's ground collision
+        if (hit.collider.gameObject.layer == LayerMask.NameToLayer("Ground"))
+        {
+            if (debugMode)
+            {
+                Debug.Log($"[Projectile] Hit ground at {hit.point}, destroying projectile");
+            }
+            
+            if (hitEffect != null)
+            {
+                Instantiate(hitEffect, hit.point, Quaternion.identity);
+            }
+            DestroyProjectile();
+            return;
+        }
+        
+        // Regular collision with other objects (walls, etc.)
         if (debugMode)
         {
             Debug.Log($"[Projectile] Regular collision with {hit.collider.name}, destroying projectile");

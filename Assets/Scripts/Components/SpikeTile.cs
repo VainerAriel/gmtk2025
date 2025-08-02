@@ -205,12 +205,23 @@ public class SpikeTile : MonoBehaviour
     }
     
     /// <summary>
-    /// Restart the automatic cycle
+    /// Restart the automatic cycle and reset to initial state
     /// </summary>
     public void RestartCycle()
     {
         StopCycle();
+        
+        // Reset to initial state
+        isActive = startActive;
+        UpdateSpikeVisuals();
+        
+        // Restart the cycle
         spikeCycle = StartCoroutine(SpikeCycle());
+        
+        if (debugMode)
+        {
+            Debug.Log($"[SpikeTile] {gameObject.name} cycle restarted - Reset to initial state: {(isActive ? "ACTIVE" : "INACTIVE")}");
+        }
     }
     
     // Gizmos for visual debugging

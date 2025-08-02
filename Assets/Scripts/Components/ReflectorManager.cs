@@ -57,4 +57,22 @@ public class ReflectorManager : MonoBehaviour
             return isGrounded ? leftDownReflectPrefab : leftUpReflectPrefab;
         }
     }
+    
+    /// <summary>
+    /// Clears all reflectors in the scene
+    /// </summary>
+    public void ClearAllReflectors()
+    {
+        // Find all reflectors in the scene and destroy them
+        ReflectBlock[] reflectBlocks = FindObjectsOfType<ReflectBlock>();
+        foreach (ReflectBlock reflector in reflectBlocks)
+        {
+            if (reflector != null)
+            {
+                Destroy(reflector.gameObject);
+            }
+        }
+        
+        Debug.Log($"[ReflectorManager] Cleared {reflectBlocks.Length} reflectors from the scene");
+    }
 } 

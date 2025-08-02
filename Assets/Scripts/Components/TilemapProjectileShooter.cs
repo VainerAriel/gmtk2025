@@ -31,6 +31,9 @@ public class TilemapProjectileShooter : MonoBehaviour
             audioSource = gameObject.AddComponent<AudioSource>();
         }
         
+        // Ensure the shooter has collision components
+        SetupCollision();
+        
         // If no tilemap assigned, try to get it from this GameObject
         if (tilemap == null)
         {
@@ -50,6 +53,49 @@ public class TilemapProjectileShooter : MonoBehaviour
         {
             Debug.Log($"[TilemapProjectileShooter] {gameObject.name} initialized with direction: {shootDirection}");
         }
+    }
+    
+    /// <summary>
+    /// Ensures the shooter has proper collision components to act as a solid block
+    /// </summary>
+    private void SetupCollision()
+    {
+        // Add BoxCollider2D if it doesn't exist
+        BoxCollider2D boxCollider = GetComponent<BoxCollider2D>();
+        if (boxCollider == null)
+        {
+            boxCollider = gameObject.AddComponent<BoxCollider2D>();
+            // Set default size to 1x1 tile
+            boxCollider.size = Vector2.one;
+            boxCollider.offset = Vector2.zero;
+        }
+        
+        // Ensure it's not a trigger (should be solid)
+        boxCollider.isTrigger = false;
+        
+        // Add Rigidbody2D if it doesn't exist (for static collision)
+        Rigidbody2D rb = GetComponent<Rigidbody2D>();
+        if (rb == null)
+        {
+            rb = gameObject.AddComponent<Rigidbody2D>();
+            rb.bodyType = RigidbodyType2D.Static; // Static so it doesn't move
+            rb.simulated = true; // Enable physics simulation
+        }
+        
+        // Ensure it's on the Ground layer for proper collision
+        if (gameObject.layer != LayerMask.NameToLayer("Ground"))
+        {
+            gameObject.layer = LayerMask.NameToLayer("Ground");
+        }
+    }
+    
+    /// <summary>
+    /// Reset the shooting timer to start counting from now
+    /// </summary>
+    public void ResetTimer()
+    {
+        nextShootTime = Time.time + shootInterval;
+        Debug.Log($"[TilemapProjectileShooter] Timer reset for {gameObject.name}");
     }
     
     private void Update()
@@ -95,7 +141,7 @@ public class TilemapProjectileShooter : MonoBehaviour
         
         if (projectile != null)
         {
-            projectile.Initialize(shootDirection, projectileSpeed);
+            projectile.Initialize(shootDirection, projectileSpeed, gameObject);
         }
         
         // Visual and audio effects

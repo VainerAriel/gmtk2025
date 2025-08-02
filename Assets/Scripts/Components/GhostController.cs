@@ -26,6 +26,7 @@ public class GhostController : MonoBehaviour
     
     [Header("Electricity Transformation")]
     [SerializeField] private bool hasBeenHitByElectricity = false;
+    private Vector2 lastBulletDirection = Vector2.right; // Store the last bullet direction for reflector logic
     
     public void Initialize(PlayerController.PlayerAction[] actions, bool allowPhysicsAfterFreeze, float moveSpeed, float jumpForce, PhysicsMaterial2D playerMaterial)
     {
@@ -196,7 +197,7 @@ public class GhostController : MonoBehaviour
         if (Input.GetKeyDown(KeyCode.T))
         {
             Debug.Log($"[GhostController] Manual test transformation triggered by T key");
-            TransformIntoReflector(transform.position);
+            TransformIntoReflector(transform.position, Vector2.right); // Default to right direction for testing
         }
     }
     
@@ -329,7 +330,8 @@ public class GhostController : MonoBehaviour
         {
             Debug.Log($"[GhostController] Hit by projectile! Transforming into reflector...");
             hasBeenHitByElectricity = true;
-            TransformIntoReflector(projectile.transform.position);
+            lastBulletDirection = projectile.GetDirection(); // Store the bullet direction
+            TransformIntoReflector(projectile.transform.position, projectile.GetDirection());
         }
         else if (projectile == null)
         {
@@ -351,11 +353,12 @@ public class GhostController : MonoBehaviour
         {
             Debug.Log($"[GhostController] Hit by projectile via collision! Transforming into reflector...");
             hasBeenHitByElectricity = true;
-            TransformIntoReflector(projectile.transform.position);
+            lastBulletDirection = projectile.GetDirection(); // Store the bullet direction
+            TransformIntoReflector(projectile.transform.position, projectile.GetDirection());
         }
     }
     
-    private void TransformIntoReflector(Vector3 bulletPosition)
+    private void TransformIntoReflector(Vector3 bulletPosition, Vector2 bulletDirection)
     {
         Debug.Log($"[GhostController] TransformIntoReflector called with bullet position: {bulletPosition}");
         
@@ -371,13 +374,13 @@ public class GhostController : MonoBehaviour
         
         if (reflectorPrefab != null)
         {
-            // Calculate the center of the bottom tile of the ghost (player is 2 tiles high)
-            Vector3 bottomTileCenter = CalculateBottomTileCenter();
+            // Calculate the spawn position based on bullet direction and position
+            Vector3 spawnPosition = CalculateReflectorSpawnPosition(bulletPosition, bulletDirection);
             
             // Snap to nearest grid tile (assuming 1 unit grid size)
-            Vector3 snappedPosition = SnapToGrid(bottomTileCenter);
+            Vector3 snappedPosition = SnapToGrid(spawnPosition);
             
-            Debug.Log($"[GhostController] Creating reflector: {reflectorPrefab.name} at bottom tile center {bottomTileCenter} -> snapped to {snappedPosition}");
+            Debug.Log($"[GhostController] Creating reflector: {reflectorPrefab.name} at spawn position {spawnPosition} -> snapped to {snappedPosition}");
             
             // Create the reflector at the snapped grid position
             GameObject reflector = Instantiate(reflectorPrefab, snappedPosition, transform.rotation);
@@ -421,6 +424,63 @@ public class GhostController : MonoBehaviour
     }
     
     /// <summary>
+    /// Calculates the spawn position for reflector based on bullet direction and position
+    /// </summary>
+    /// <param name="bulletPosition">Position of the bullet</param>
+    /// <param name="bulletDirection">Direction of the bullet</param>
+    /// <returns>The spawn position for the reflector</returns>
+    private Vector3 CalculateReflectorSpawnPosition(Vector3 bulletPosition, Vector2 bulletDirection)
+    {
+        // Get the ghost's collider to find player dimensions
+        Collider2D ghostCollider = GetComponent<Collider2D>();
+        if (ghostCollider == null)
+        {
+            Debug.LogError($"[GhostController] No collider found on ghost, using bullet position");
+            return bulletPosition;
+        }
+        
+        // Calculate player center and bounds
+        Vector2 playerCenter = (Vector2)transform.position + ghostCollider.offset;
+        Vector2 playerExtents = ghostCollider.bounds.extents;
+        
+        // Determine if bullet is horizontal or vertical
+        bool isHorizontal = Mathf.Abs(bulletDirection.x) > Mathf.Abs(bulletDirection.y);
+        
+        Vector3 spawnPosition;
+        
+        if (isHorizontal)
+        {
+            // Horizontal bullet: use centerX of player, centerY of bullet
+            spawnPosition = new Vector3(playerCenter.x, bulletPosition.y, transform.position.z);
+            Debug.Log($"[GhostController] Horizontal bullet - Player center X: {playerCenter.x}, Bullet Y: {bulletPosition.y}");
+        }
+        else
+        {
+            // Vertical bullet: use centerX of bullet, and determine Y based on bullet direction
+            bool bulletComingFromAbove = bulletDirection.y < 0; // Negative Y means bullet is moving downward
+            
+            if (bulletComingFromAbove)
+            {
+                // Bullet hit from above: use top tile of player
+                float topTileCenter = playerCenter.y + playerExtents.y - 0.5f; // Top of player minus half a tile
+                spawnPosition = new Vector3(bulletPosition.x, topTileCenter, transform.position.z);
+                Debug.Log($"[GhostController] Vertical bullet from above - Bullet X: {bulletPosition.x}, Player top tile: {topTileCenter}");
+            }
+            else
+            {
+                // Bullet hit from below: use bottom tile of player
+                float bottomTileCenter = playerCenter.y - playerExtents.y + 0.5f; // Bottom of player plus half a tile
+                spawnPosition = new Vector3(bulletPosition.x, bottomTileCenter, transform.position.z);
+                Debug.Log($"[GhostController] Vertical bullet from below - Bullet X: {bulletPosition.x}, Player bottom tile: {bottomTileCenter}");
+            }
+        }
+        
+        Debug.Log($"[GhostController] Bullet direction: {bulletDirection}, Is horizontal: {isHorizontal}, Spawn position: {spawnPosition}");
+        
+        return spawnPosition;
+    }
+    
+    /// <summary>
     /// Snaps a world position to the nearest grid tile center
     /// </summary>
     /// <param name="worldPosition">The world position to snap</param>
@@ -443,18 +503,55 @@ public class GhostController : MonoBehaviour
         
         Debug.Log($"[GhostController] Determining reflector type - FacingRight: {isFacingRight}, IsGrounded: {isGrounded}");
         
-        // Determine reflector type based on direction and ground state
-        if (isFacingRight)
+        // Determine reflector type based on bullet direction and player state
+        // For horizontal bullets: face the bullet, then up/down based on grounded state
+        // For vertical bullets: face the bullet, then left/right based on player facing direction
+        
+        // Get the bullet direction from the last collision (we'll need to store this)
+        Vector2 bulletDirection = GetLastBulletDirection();
+        bool isHorizontalBullet = Mathf.Abs(bulletDirection.x) > Mathf.Abs(bulletDirection.y);
+        
+        Debug.Log($"[GhostController] Bullet direction: {bulletDirection}, Is horizontal: {isHorizontalBullet}");
+        
+        if (isHorizontalBullet)
         {
-            GameObject prefab = isGrounded ? ReflectorManager.Instance.RightUpReflectPrefab : ReflectorManager.Instance.RightDownReflectPrefab;
-            Debug.Log($"[GhostController] Right-facing ghost, grounded: {isGrounded}, selected prefab: {(prefab != null ? prefab.name : "NULL")}");
-            return prefab;
+            // Horizontal bullet: face the bullet, then up/down based on grounded state
+            bool bulletComingFromRight = bulletDirection.x < 0;
+            
+            if (bulletComingFromRight)
+            {
+                // Bullet coming from right, reflector faces right
+                GameObject prefab = isGrounded ? ReflectorManager.Instance.RightUpReflectPrefab : ReflectorManager.Instance.RightDownReflectPrefab;
+                Debug.Log($"[GhostController] Horizontal bullet from right, grounded: {isGrounded}, selected prefab: {(prefab != null ? prefab.name : "NULL")}");
+                return prefab;
+            }
+            else
+            {
+                // Bullet coming from left, reflector faces left
+                GameObject prefab = isGrounded ? ReflectorManager.Instance.LeftUpReflectPrefab : ReflectorManager.Instance.LeftDownReflectPrefab;
+                Debug.Log($"[GhostController] Horizontal bullet from left, grounded: {isGrounded}, selected prefab: {(prefab != null ? prefab.name : "NULL")}");
+                return prefab;
+            }
         }
         else
         {
-            GameObject prefab = isGrounded ? ReflectorManager.Instance.LeftUpReflectPrefab : ReflectorManager.Instance.LeftDownReflectPrefab;
-            Debug.Log($"[GhostController] Left-facing ghost, grounded: {isGrounded}, selected prefab: {(prefab != null ? prefab.name : "NULL")}");
-            return prefab;
+            // Vertical bullet: face the bullet, then left/right based on player facing direction
+            bool bulletComingFromAbove = bulletDirection.y < 0;
+            
+            if (bulletComingFromAbove)
+            {
+                // Bullet coming from above, reflector faces up
+                GameObject prefab = isFacingRight ? ReflectorManager.Instance.RightUpReflectPrefab : ReflectorManager.Instance.LeftUpReflectPrefab;
+                Debug.Log($"[GhostController] Vertical bullet from above, facing right: {isFacingRight}, selected prefab: {(prefab != null ? prefab.name : "NULL")}");
+                return prefab;
+            }
+            else
+            {
+                // Bullet coming from below, reflector faces down
+                GameObject prefab = isFacingRight ? ReflectorManager.Instance.RightDownReflectPrefab : ReflectorManager.Instance.LeftDownReflectPrefab;
+                Debug.Log($"[GhostController] Vertical bullet from below, facing right: {isFacingRight}, selected prefab: {(prefab != null ? prefab.name : "NULL")}");
+                return prefab;
+            }
         }
     }
     
@@ -484,7 +581,25 @@ public class GhostController : MonoBehaviour
         if (!hasBeenHitByElectricity)
         {
             hasBeenHitByElectricity = true;
-            TransformIntoReflector(transform.position);
+            TransformIntoReflector(transform.position, Vector2.right); // Default to right direction for testing
         }
+    }
+    
+    /// <summary>
+    /// Reset the electricity hit state so the ghost can transform again
+    /// </summary>
+    public void ResetElectricityHitState()
+    {
+        hasBeenHitByElectricity = false;
+        Debug.Log($"[GhostController] Electricity hit state reset for {gameObject.name}");
+    }
+    
+    /// <summary>
+    /// Get the last bullet direction that hit this ghost
+    /// </summary>
+    /// <returns>The direction of the last bullet that hit this ghost</returns>
+    private Vector2 GetLastBulletDirection()
+    {
+        return lastBulletDirection;
     }
 } 
