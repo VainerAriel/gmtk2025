@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using UnityEngine.Windows;
 using Input = UnityEngine.Input;
 using Unity.Burst.CompilerServices;
+using System;
 
 public class PlayerController : MonoBehaviour
 {
@@ -304,12 +305,12 @@ public class PlayerController : MonoBehaviour
             block.ResetPosition();
         }
     }
-
-    private void CheckGrounded()
+    
+    public bool CheckGrounded()
     {
         // Get the player's collider to find the bottom position
         Collider2D playerCollider = GetComponent<Collider2D>();
-        if (playerCollider == null) return;
+        if (playerCollider == null) return false;
         
         // Calculate the bottom center of the player
         Vector2 bottomCenter = (Vector2)transform.position + playerCollider.offset;
@@ -318,9 +319,8 @@ public class PlayerController : MonoBehaviour
         // Cast ray from bottom center downward
         RaycastHit2D hit = Physics2D.Raycast(bottomCenter, Vector2.down, groundCheckDistance, groundLayer);
         isGrounded = hit.collider != null;
-        
-        // Debug visualization
-        Debug.DrawRay(bottomCenter, Vector2.down * groundCheckDistance, isGrounded ? Color.green : Color.red);
+
+        return isGrounded;
     }
     
     public void TakeDamage(float damage)
