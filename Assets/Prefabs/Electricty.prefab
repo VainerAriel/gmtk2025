@@ -141,7 +141,7 @@ MonoBehaviour:
   maxDistance: 50
   collisionLayers:
     serializedVersion: 2
-    m_Bits: 2368
+    m_Bits: 10560
   reflectLayers:
     serializedVersion: 2
     m_Bits: 2048
