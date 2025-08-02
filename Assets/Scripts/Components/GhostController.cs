@@ -24,6 +24,9 @@ public class GhostController : MonoBehaviour
     
     private PhysicsMaterial2D originalMaterial;
     
+    [Header("Electricity Transformation")]
+    [SerializeField] private bool hasBeenHitByElectricity = false;
+    
     public void Initialize(PlayerController.PlayerAction[] actions, bool allowPhysicsAfterFreeze, float moveSpeed, float jumpForce, PhysicsMaterial2D playerMaterial)
     {
         recordedActions = actions;
@@ -34,6 +37,7 @@ public class GhostController : MonoBehaviour
         currentActionIndex = 0;
         isReplaying = true;
         hasJumped = false;
+        hasBeenHitByElectricity = false; // Reset electricity hit state
         
         // Get or add required components
         rb = GetComponent<Rigidbody2D>();
@@ -115,6 +119,7 @@ public class GhostController : MonoBehaviour
         currentActionIndex = 0;
         isReplaying = true;
         hasJumped = false;
+        hasBeenHitByElectricity = false; // Reset electricity hit state
         
         // Reset rigidbody
         if (rb != null)
@@ -186,6 +191,13 @@ public class GhostController : MonoBehaviour
         
         // Update visual appearance
         UpdateVisualAppearance();
+        
+        // Debug: Press T to test transformation
+        if (Input.GetKeyDown(KeyCode.T))
+        {
+            Debug.Log($"[GhostController] Manual test transformation triggered by T key");
+            TransformIntoReflector(transform.position);
+        }
     }
     
     private void CheckGrounded()
@@ -223,6 +235,16 @@ public class GhostController : MonoBehaviour
                 rb.AddForce(Vector2.up * jumpForce, ForceMode2D.Impulse);
                 hasJumped = true;
             }
+        }
+        
+        // Flip character sprite based on movement direction (like the player does)
+        if (action.horizontalInput > 0)
+        {
+            transform.localScale = new Vector3(1, transform.localScale.y, transform.localScale.z); // Face right
+        }
+        else if (action.horizontalInput < 0)
+        {
+            transform.localScale = new Vector3(-1, transform.localScale.y, transform.localScale.z); // Face left
         }
     }
     
@@ -299,12 +321,170 @@ public class GhostController : MonoBehaviour
     
     private void OnTriggerEnter2D(Collider2D other)
     {
-        // Ghosts can pass through objects but we can add visual effects here if needed
-        // For example, we could add a particle effect when ghost passes through walls
+        Debug.Log($"[GhostController] Trigger entered with: {other.name}, layer: {LayerMask.LayerToName(other.gameObject.layer)}");
+        
+        // Check if hit by electricity projectile
+        Projectile projectile = other.GetComponent<Projectile>();
+        if (projectile != null && !hasBeenHitByElectricity)
+        {
+            Debug.Log($"[GhostController] Hit by projectile! Transforming into reflector...");
+            hasBeenHitByElectricity = true;
+            TransformIntoReflector(projectile.transform.position);
+        }
+        else if (projectile == null)
+        {
+            Debug.Log($"[GhostController] Hit by something without Projectile component: {other.name}");
+        }
+        else if (hasBeenHitByElectricity)
+        {
+            Debug.Log($"[GhostController] Already been hit by electricity, ignoring");
+        }
+    }
+    
+    private void OnCollisionEnter2D(Collision2D collision)
+    {
+        Debug.Log($"[GhostController] Collision with: {collision.gameObject.name}, layer: {LayerMask.LayerToName(collision.gameObject.layer)}");
+        
+        // Check if hit by electricity projectile
+        Projectile projectile = collision.gameObject.GetComponent<Projectile>();
+        if (projectile != null && !hasBeenHitByElectricity)
+        {
+            Debug.Log($"[GhostController] Hit by projectile via collision! Transforming into reflector...");
+            hasBeenHitByElectricity = true;
+            TransformIntoReflector(projectile.transform.position);
+        }
+    }
+    
+    private void TransformIntoReflector(Vector3 bulletPosition)
+    {
+        Debug.Log($"[GhostController] TransformIntoReflector called with bullet position: {bulletPosition}");
+        
+        // Check if ReflectorManager exists
+        if (ReflectorManager.Instance == null)
+        {
+            Debug.LogError($"[GhostController] ReflectorManager.Instance is null! Make sure ReflectorManager exists in the scene.");
+            return;
+        }
+        
+        // Determine which reflector to spawn based on ghost state
+        GameObject reflectorPrefab = DetermineReflectorType();
+        
+        if (reflectorPrefab != null)
+        {
+            // Calculate the center of the bottom tile of the ghost (player is 2 tiles high)
+            Vector3 bottomTileCenter = CalculateBottomTileCenter();
+            
+            // Snap to nearest grid tile (assuming 1 unit grid size)
+            Vector3 snappedPosition = SnapToGrid(bottomTileCenter);
+            
+            Debug.Log($"[GhostController] Creating reflector: {reflectorPrefab.name} at bottom tile center {bottomTileCenter} -> snapped to {snappedPosition}");
+            
+            // Create the reflector at the snapped grid position
+            GameObject reflector = Instantiate(reflectorPrefab, snappedPosition, transform.rotation);
+            
+            // Destroy the ghost
+            Destroy(gameObject);
+            
+            Debug.Log($"[GhostController] Ghost transformed into reflector: {reflectorPrefab.name} at grid position {snappedPosition}");
+        }
+        else
+        {
+            Debug.LogError($"[GhostController] reflectorPrefab is null! Check ReflectorManager prefab assignments.");
+        }
+    }
+    
+    /// <summary>
+    /// Calculates the center of the bottom tile of the ghost (player is 2 tiles high)
+    /// </summary>
+    /// <returns>The center position of the bottom tile</returns>
+    private Vector3 CalculateBottomTileCenter()
+    {
+        // Get the ghost's collider to find the bottom position
+        Collider2D ghostCollider = GetComponent<Collider2D>();
+        if (ghostCollider == null)
+        {
+            Debug.LogError($"[GhostController] No collider found on ghost, using transform position");
+            return transform.position;
+        }
+        
+        // Calculate the bottom center of the ghost (same logic as CheckGrounded)
+        Vector2 bottomCenter = (Vector2)transform.position + ghostCollider.offset;
+        bottomCenter.y -= ghostCollider.bounds.extents.y;
+        
+        // Since the player is 2 tiles high, the bottom tile center is at the bottom of the ghost
+        // We need to move up by half a tile (0.5 units) to get to the center of the bottom tile
+        Vector3 bottomTileCenter = new Vector3(bottomCenter.x, bottomCenter.y + 0.5f, transform.position.z);
+        
+        Debug.Log($"[GhostController] Ghost position: {transform.position}, Bottom center: {bottomCenter}, Bottom tile center: {bottomTileCenter}");
+        
+        return bottomTileCenter;
+    }
+    
+    /// <summary>
+    /// Snaps a world position to the nearest grid tile center
+    /// </summary>
+    /// <param name="worldPosition">The world position to snap</param>
+    /// <param name="gridSize">The size of each grid tile (default 1.0)</param>
+    /// <returns>The snapped grid position at tile center</returns>
+    private Vector3 SnapToGrid(Vector3 worldPosition, float gridSize = 1.0f)
+    {
+        // Round to the nearest grid tile center (not corner)
+        float snappedX = Mathf.Round(worldPosition.x + 0.5f) - 0.5f;
+        float snappedY = Mathf.Round(worldPosition.y + 0.5f) - 0.5f;
+        
+        return new Vector3(snappedX, snappedY, worldPosition.z);
+    }
+    
+    private GameObject DetermineReflectorType()
+    {
+        // Get the ghost's current state
+        bool isFacingRight = transform.localScale.x > 0;
+        bool isGrounded = CheckGroundedState();
+        
+        Debug.Log($"[GhostController] Determining reflector type - FacingRight: {isFacingRight}, IsGrounded: {isGrounded}");
+        
+        // Determine reflector type based on direction and ground state
+        if (isFacingRight)
+        {
+            GameObject prefab = isGrounded ? ReflectorManager.Instance.RightUpReflectPrefab : ReflectorManager.Instance.RightDownReflectPrefab;
+            Debug.Log($"[GhostController] Right-facing ghost, grounded: {isGrounded}, selected prefab: {(prefab != null ? prefab.name : "NULL")}");
+            return prefab;
+        }
+        else
+        {
+            GameObject prefab = isGrounded ? ReflectorManager.Instance.LeftUpReflectPrefab : ReflectorManager.Instance.LeftDownReflectPrefab;
+            Debug.Log($"[GhostController] Left-facing ghost, grounded: {isGrounded}, selected prefab: {(prefab != null ? prefab.name : "NULL")}");
+            return prefab;
+        }
+    }
+    
+    private bool CheckGroundedState()
+    {
+        // Use the same ground check logic as the player
+        Collider2D ghostCollider = GetComponent<Collider2D>();
+        if (ghostCollider == null) return false;
+        
+        Vector2 bottomCenter = (Vector2)transform.position + ghostCollider.offset;
+        bottomCenter.y -= ghostCollider.bounds.extents.y;
+        
+        RaycastHit2D hit = Physics2D.Raycast(bottomCenter, Vector2.down, groundCheckDistance, groundLayer);
+        return hit.collider != null;
     }
     
     private void OnDestroy()
     {
         // Clean up any resources if needed
+    }
+    
+    /// <summary>
+    /// Manually trigger transformation into reflector (for testing)
+    /// </summary>
+    public void ManualTransformIntoReflector()
+    {
+        if (!hasBeenHitByElectricity)
+        {
+            hasBeenHitByElectricity = true;
+            TransformIntoReflector(transform.position);
+        }
     }
 } 

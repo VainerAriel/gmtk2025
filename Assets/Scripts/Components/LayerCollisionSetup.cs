@@ -67,8 +67,8 @@ public class LayerCollisionSetup : MonoBehaviour
             Physics2D.IgnoreLayerCollision(projectileLayer, reflectLayer, false);
             Physics2D.IgnoreLayerCollision(projectileLayer, playerLayer, false);
             
-            // Projectiles don't collide with ghosts
-            Physics2D.IgnoreLayerCollision(projectileLayer, ghostLayer, true);
+            // Projectiles DO collide with ghosts (for electricity transformation)
+            Physics2D.IgnoreLayerCollision(projectileLayer, ghostLayer, false);
             
             Debug.Log($"Setup projectile layer ({projectileLayer}) collisions");
         }

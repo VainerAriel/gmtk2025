@@ -27,6 +27,9 @@ public class PlayerController : MonoBehaviour
     [SerializeField] private GameObject ghostPrefab;
     [SerializeField] private bool allowGhostPhysicsAfterFreeze = false;
     
+    [Header("Electricity Death")]
+    [SerializeField] private bool instantDeathFromElectricity = true;
+    
     private Rigidbody2D rb;
     private bool isGrounded;
     private bool hasJumped = false;
@@ -261,9 +264,19 @@ public class PlayerController : MonoBehaviour
     public void TakeDamage(float damage)
     {
         currentHealth -= damage;
+        
+        // Check for instant death from electricity (very high damage)
+        if (instantDeathFromElectricity && damage >= 999f)
+        {
+            // Instant death - respawn immediately
+            RespawnPlayer();
+            currentHealth = maxHealth;
+            return;
+        }
+        
         if (currentHealth <= 0)
         {
-            // Automatic respawn when health reaches zero
+            // Normal death when health reaches zero
             RespawnPlayer();
             currentHealth = maxHealth;
         }

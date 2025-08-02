@@ -5,7 +5,7 @@ public class Projectile : MonoBehaviour
 {
     [Header("Projectile Settings")]
     [SerializeField] private float defaultSpeed = 8f; // Default speed if not set by shooter
-    [SerializeField] private float damage = 20f;
+    [SerializeField] private float damage = 999f; // High damage for instant death
     [SerializeField] private float maxDistance = 50f;
     [SerializeField] private LayerMask collisionLayers = -1;
     [SerializeField] private LayerMask reflectLayers = -1;
@@ -137,7 +137,7 @@ public class Projectile : MonoBehaviour
                 return;
             }
         }
-        
+
         // Check if it's the player
         PlayerController player = hit.collider.GetComponent<PlayerController>();
         if (player != null)
@@ -146,7 +146,9 @@ public class Projectile : MonoBehaviour
             {
                 Debug.Log($"[Projectile] Hit player, dealing {damage} damage");
             }
+            
             player.TakeDamage(damage);
+            
             if (hitEffect != null)
             {
                 Instantiate(hitEffect, hit.point, Quaternion.identity);
@@ -268,7 +270,9 @@ public class Projectile : MonoBehaviour
             {
                 Debug.Log($"[Projectile] Trigger hit player, dealing {damage} damage");
             }
+            
             player.TakeDamage(damage);
+            
             if (hitEffect != null)
             {
                 Instantiate(hitEffect, transform.position, Quaternion.identity);
