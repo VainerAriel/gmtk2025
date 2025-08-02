@@ -64,8 +64,13 @@ public class PlayerController : MonoBehaviour
         public bool hasJumped;
         public float horizontalInput;
         public bool jumpPressed;
-        
-        public PlayerAction(float time, Vector3 pos, Vector2 vel, bool grounded, bool jumped, float horizontal, bool jump)
+
+        public float xVelocityAnim;
+        public float yVelocityAnim;
+        public bool isJumpingAnim;
+        public bool isPushingAnim;
+
+        public PlayerAction(float time, Vector3 pos, Vector2 vel, bool grounded, bool jumped, float horizontal, bool jump, float xVelAnim, float yVelAnim, bool isJumping, bool isPushing)
         {
             timestamp = time;
             position = pos;
@@ -74,6 +79,11 @@ public class PlayerController : MonoBehaviour
             hasJumped = jumped;
             horizontalInput = horizontal;
             jumpPressed = jump;
+
+            xVelocityAnim = xVelAnim;
+            yVelocityAnim = yVelAnim;
+            isJumpingAnim = isJumping;
+            isPushingAnim = isPushing;
         }
     }
     
@@ -199,6 +209,13 @@ public class PlayerController : MonoBehaviour
     private void RecordAction(float horizontalInput, bool jumpPressed)
     {
         float currentTime = Time.time - gameStartTime;
+
+        // Capture the current animation states
+        float xVelocityAnim = animator.GetFloat("xVelocity");
+        float yVelocityAnim = animator.GetFloat("yVelocity");
+        bool isJumpingAnim = animator.GetBool("isJumping");
+        bool isPushingAnim = animator.GetBool("isPushing");
+
         PlayerAction action = new PlayerAction(
             currentTime,
             transform.position,
@@ -206,7 +223,11 @@ public class PlayerController : MonoBehaviour
             isGrounded,
             hasJumped,
             horizontalInput,
-            jumpPressed
+            jumpPressed,
+            xVelocityAnim,
+            yVelocityAnim,
+            isJumpingAnim,
+            isPushingAnim
         );
         recordedActions.Add(action);
     }
@@ -272,10 +293,10 @@ public class PlayerController : MonoBehaviour
         }
         else
         {
-            // Create a simple ghost if no prefab is assigned
+            // Create a simple ghost since no prefab is assigned
             ghostObject = new GameObject("Ghost");
             ghostObject.transform.position = startPosition;
-            
+
             // Add sprite renderer with ghost appearance
             SpriteRenderer ghostRenderer = ghostObject.AddComponent<SpriteRenderer>();
             SpriteRenderer playerRenderer = GetComponent<SpriteRenderer>();
@@ -284,8 +305,8 @@ public class PlayerController : MonoBehaviour
                 ghostRenderer.sprite = playerRenderer.sprite;
                 ghostRenderer.color = new Color(1f, 1f, 1f, 0.5f); // Semi-transparent
             }
-            
-            // Add collider (non-trigger for visual purposes)
+
+            // Add a BoxCollider2D
             BoxCollider2D ghostCollider = ghostObject.AddComponent<BoxCollider2D>();
             BoxCollider2D playerCollider = GetComponent<BoxCollider2D>();
             if (playerCollider != null)
@@ -294,15 +315,23 @@ public class PlayerController : MonoBehaviour
                 ghostCollider.offset = playerCollider.offset;
             }
             ghostCollider.isTrigger = true; // Make it non-solid
+
+            // --- NEW: ADD AND CONFIGURE THE ANIMATOR ---
+            Animator ghostAnimator = ghostObject.AddComponent<Animator>();
+            // Get a reference to the player's Animator to copy its controller
+            Animator playerAnimator = GetComponent<Animator>();
+            if (playerAnimator != null && playerAnimator.runtimeAnimatorController != null)
+            {
+                // Assign the player's Animator Controller to the ghost's Animator
+                ghostAnimator.runtimeAnimatorController = playerAnimator.runtimeAnimatorController;
+            }
+
+            ghostObject.layer = LayerMask.NameToLayer("Ghost");
+
+            GhostController ghostController = ghostObject.AddComponent<GhostController>();
+            ghostController.Initialize(recordedActions.ToArray(), allowGhostPhysicsAfterFreeze, moveSpeed, jumpForce, rb.sharedMaterial);
+            activeGhosts.Add(ghostController);
         }
-        
-        // Set ghost to Ghost layer
-        ghostObject.layer = LayerMask.NameToLayer("Ghost");
-        
-        // Add ghost controller
-        GhostController ghostController = ghostObject.AddComponent<GhostController>();
-        ghostController.Initialize(recordedActions.ToArray(), allowGhostPhysicsAfterFreeze, moveSpeed, jumpForce, rb.sharedMaterial);
-        activeGhosts.Add(ghostController);
     }
 
     // New method to reset all pushable blocks

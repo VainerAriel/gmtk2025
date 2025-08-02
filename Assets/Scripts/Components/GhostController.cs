@@ -21,6 +21,8 @@ public class GhostController : MonoBehaviour
     private float blockPushCooldown = 0.2f;
     private float blockPushTimer = 0f;
 
+    private Animator animator;
+
     [Header("Ghost Settings")]
     [SerializeField] private float ghostAlpha = 0.5f;
     [SerializeField] private Color ghostColor = new Color(1f, 1f, 1f, 0.5f);
@@ -42,10 +44,17 @@ public class GhostController : MonoBehaviour
         isReplaying = true;
         hasJumped = false;
 
+
         rb = GetComponent<Rigidbody2D>();
         if (rb == null)
         {
             rb = gameObject.AddComponent<Rigidbody2D>();
+        }
+
+        animator = GetComponent<Animator>();
+        if (animator == null)
+        {
+            Debug.LogError("Ghost prefab is missing an Animator component!");
         }
 
         rb.gravityScale = 3f;
@@ -221,6 +230,14 @@ public class GhostController : MonoBehaviour
                         }
                     }
                 }
+            }
+
+            if (animator != null)
+            {
+                animator.SetFloat("xVelocity", action.xVelocityAnim);
+                animator.SetFloat("yVelocity", action.yVelocityAnim);
+                animator.SetBool("isJumping", action.isJumpingAnim);
+                animator.SetBool("isPushing", action.isPushingAnim);
             }
         }
     }
