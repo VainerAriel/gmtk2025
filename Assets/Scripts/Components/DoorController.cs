@@ -11,6 +11,7 @@ public class DoorController : MonoBehaviour
     [SerializeField] private Rigidbody2D doorRigidbody;
     
     private Vector3 originalPosition;
+    Animator animator;
     
     private void Start()
     {
@@ -32,6 +33,7 @@ public class DoorController : MonoBehaviour
         {
             doorRigidbody = GetComponent<Rigidbody2D>();
         }
+        animator = GetComponent<Animator>();
     }
     
     public void Initialize(Vector2 direction, float distance, float speed)
@@ -50,6 +52,7 @@ public class DoorController : MonoBehaviour
             
             // Hide the door (disable sprite and collider)
             HideDoor();
+            animator.SetBool("isOpen", true);
         }
         else
         {
@@ -65,6 +68,7 @@ public class DoorController : MonoBehaviour
             
             // Show the door (enable sprite and collider)
             ShowDoor();
+            animator.SetBool("isOpen", false);
         }
     }
     
@@ -72,13 +76,13 @@ public class DoorController : MonoBehaviour
     
     private void HideDoor()
     {
-        // Disable sprite rendering
-        if (doorSprite != null)
-        {
-            doorSprite.enabled = false;
-        }
+        // Keep sprite rendering enabled so animations are visible
+        // if (doorSprite != null)
+        // {
+        //     doorSprite.enabled = false;
+        // }
         
-        // Disable collider
+        // Disable collider so entities can pass through
         if (doorCollider != null)
         {
             doorCollider.enabled = false;
@@ -90,18 +94,18 @@ public class DoorController : MonoBehaviour
             doorRigidbody.simulated = false;
         }
         
-        Debug.Log("Door hidden - entities can now pass through");
+        Debug.Log("Door collision disabled - entities can now pass through while door remains visible");
     }
     
     private void ShowDoor()
     {
-        // Enable sprite rendering
-        if (doorSprite != null)
-        {
-            doorSprite.enabled = true;
-        }
+        // Sprite rendering should already be enabled for animations
+        // if (doorSprite != null)
+        // {
+        //     doorSprite.enabled = true;
+        // }
         
-        // Enable collider
+        // Enable collider so entities cannot pass through
         if (doorCollider != null)
         {
             doorCollider.enabled = true;
@@ -113,7 +117,7 @@ public class DoorController : MonoBehaviour
             doorRigidbody.simulated = true;
         }
         
-        Debug.Log("Door shown - entities can no longer pass through");
+        Debug.Log("Door collision enabled - entities can no longer pass through");
     }
     
     public void Reset()
