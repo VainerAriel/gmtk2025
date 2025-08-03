@@ -3,8 +3,7 @@
 --- !u!78 &1
 TagManager:
   serializedVersion: 2
-  tags:
-  - reflect_block_placeholder
+  tags: []
   layers:
   - Default
   - TransparentFX
@@ -17,11 +16,11 @@ TagManager:
   - Ground
   - Moveable Blocks
   - BG
-  - Projectile
-  - Reflect
-  - ProjectileShooter
-  - Spike
-  - Acid_Pool
+  - 
+  - 
+  - 
+  - 
+  - 
   - 
   - 
   - 
@@ -45,17 +44,8 @@ TagManager:
   - name: BG
     uniqueID: 406282791
     locked: 0
-  - name: Projectiles
-    uniqueID: 293057827
-    locked: 0
-  - name: Spikes
-    uniqueID: 1426605441
-    locked: 0
   - name: Ground
     uniqueID: 349612151
-    locked: 0
-  - name: Acid Pool
-    uniqueID: 1773048773
     locked: 0
   - name: Player
     uniqueID: 258913773

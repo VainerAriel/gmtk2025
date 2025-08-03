@@ -12,7 +12,7 @@ public class PlayerController : MonoBehaviour
     [SerializeField] private float jumpForce = 14f;
     
     [Header("Ground Check")]
-    [SerializeField] private LayerMask groundLayer = 256; // Layer 8 (Ground)
+    [SerializeField] private LayerMask groundLayer = 1;
     [SerializeField] private float groundCheckDistance = 0.1f;
     
     [Header("Health")]
@@ -34,10 +34,6 @@ public class PlayerController : MonoBehaviour
     [Header("Pushable Boxes")]
     [SerializeField] private LayerMask pushableLayer;  // Assign in inspector to the layer your blocks are on
     [SerializeField] private float pushDistance = 0.51f;  // How far to check for blocks
-    
-    [Header("Death Types")]
-    [SerializeField] private bool instantDeathFromElectricity = true;
-    [SerializeField] private bool instantDeathFromSpike = true;
 
     private Rigidbody2D rb;
     private bool isGrounded;
@@ -51,11 +47,8 @@ public class PlayerController : MonoBehaviour
     // Ghost system variables
     private List<PlayerAction> recordedActions = new List<PlayerAction>();
     private List<GhostController> activeGhosts = new List<GhostController>();
-    private List<PlayerAction[]> ghostMemories = new List<PlayerAction[]>(); // Store memories for each ghost
     private float gameStartTime;
     private bool isRecording = true;
-    
-    private bool isPoisoned = false;
     
     [System.Serializable]
     public class PlayerAction
@@ -88,8 +81,8 @@ public class PlayerController : MonoBehaviour
         currentHealth = maxHealth;
         gameStartTime = Time.time;
         
-        // Set player to Player layer (layer 6)
-        gameObject.layer = 6;
+        // Set player to Player layer
+        gameObject.layer = LayerMask.NameToLayer("Player");
         
         // Prevent rotation
         if (rb != null)
@@ -211,9 +204,6 @@ public class PlayerController : MonoBehaviour
         // Stop recording current session
         isRecording = false;
         
-        // Reset everything when player dies
-        ResetGameState();
-        
         // Create ghost from recorded actions
         if (recordedActions.Count > 0)
         {
@@ -222,9 +212,6 @@ public class PlayerController : MonoBehaviour
         
         // Restart all active ghosts
         RestartAllGhosts();
-        
-        // Clear poison status on respawn
-        SetPoisoned(false);
 
         // Find all PushableBlock objects in the scene and reset their positions
         ResetAllPushableBlocks();
@@ -241,148 +228,19 @@ public class PlayerController : MonoBehaviour
         isRecording = true;
     }
     
-    /// <summary>
-    /// Resets the entire game state when player dies
-    /// </summary>
-    private void ResetGameState()
-    {
-        // Clear all reflectors
-        if (ReflectorManager.Instance != null)
-        {
-            ReflectorManager.Instance.ClearAllReflectors();
-        }
-        
-        // Clear all falling grounds
-        if (FallingBlockManager.Instance != null)
-        {
-            FallingBlockManager.Instance.ClearAllFallingGrounds();
-        }
-        
-        // Clear all bullets from the screen
-        Projectile[] allProjectiles = FindObjectsOfType<Projectile>();
-        foreach (Projectile projectile in allProjectiles)
-        {
-            if (projectile != null)
-            {
-                Destroy(projectile.gameObject);
-            }
-        }
-        
-        // Reset all projectile shooters
-        ProjectileShooter[] projectileShooters = FindObjectsOfType<ProjectileShooter>();
-        foreach (ProjectileShooter shooter in projectileShooters)
-        {
-            if (shooter != null)
-            {
-                shooter.ResetTimer();
-            }
-        }
-        
-        // Reset all tilemap projectile shooters
-        TilemapProjectileShooter[] tilemapShooters = FindObjectsOfType<TilemapProjectileShooter>();
-        foreach (TilemapProjectileShooter shooter in tilemapShooters)
-        {
-            if (shooter != null)
-            {
-                shooter.ResetTimer();
-            }
-        }
-        
-        // Reset all tilemap spike managers
-        TilemapSpikeManager[] tilemapSpikeManagers = FindObjectsOfType<TilemapSpikeManager>();
-        foreach (TilemapSpikeManager spikeManager in tilemapSpikeManagers)
-        {
-            if (spikeManager != null)
-            {
-                spikeManager.RestartCycle();
-            }
-        }
-        
-        // Reset all ghosts' electricity and spike hit states
-        foreach (GhostController ghost in activeGhosts)
-        {
-            if (ghost != null)
-            {
-                ghost.ResetElectricityHitState();
-                ghost.ResetSpikeHitState();
-            }
-        }
-        
-    }
-    
     private void RestartAllGhosts()
     {
-        // Clear existing ghosts
         foreach (GhostController ghost in activeGhosts)
         {
             if (ghost != null)
             {
-                Destroy(ghost.gameObject);
+                ghost.RestartReplay();
             }
         }
-        activeGhosts.Clear();
-        
-        // Recreate ghosts with their stored memories
-        for (int i = 0; i < ghostMemories.Count; i++)
-        {
-            if (i < ghostMemories.Count)
-            {
-                CreateGhostFromMemory(ghostMemories[i], i);
-            }
-        }
-    }
-    
-    private void CreateGhostFromMemory(PlayerAction[] memory, int memoryIndex)
-    {
-        // Create ghost object
-        GameObject ghostObject;
-        if (ghostPrefab != null)
-        {
-            ghostObject = Instantiate(ghostPrefab, startPosition, Quaternion.identity);
-        }
-        else
-        {
-            // Create a simple ghost if no prefab is assigned
-            ghostObject = new GameObject("Ghost");
-            ghostObject.transform.position = startPosition;
-            
-            // Add sprite renderer with ghost appearance
-            SpriteRenderer ghostRenderer = ghostObject.AddComponent<SpriteRenderer>();
-            SpriteRenderer playerRenderer = GetComponent<SpriteRenderer>();
-            if (playerRenderer != null && playerRenderer.sprite != null)
-            {
-                ghostRenderer.sprite = playerRenderer.sprite;
-                ghostRenderer.color = new Color(1f, 1f, 1f, 0.5f); // Semi-transparent
-            }
-            
-            // Add collider (non-trigger for visual purposes)
-            BoxCollider2D ghostCollider = ghostObject.AddComponent<BoxCollider2D>();
-            BoxCollider2D playerCollider = GetComponent<BoxCollider2D>();
-            if (playerCollider != null)
-            {
-                ghostCollider.size = playerCollider.size;
-                ghostCollider.offset = playerCollider.offset;
-            }
-            ghostCollider.isTrigger = true; // Make it non-solid
-        }
-        
-        // Set ghost to Ghost layer (layer 7)
-        ghostObject.layer = 7;
-        
-        // Add ghost controller with the stored memory
-        GhostController ghostController = ghostObject.AddComponent<GhostController>();
-        ghostController.Initialize(memory, allowGhostPhysicsAfterFreeze, moveSpeed, jumpForce, rb.sharedMaterial);
-        activeGhosts.Add(ghostController);
-        
-        Debug.Log($"[PlayerController] Recreated ghost {memoryIndex} with {memory.Length} recorded actions");
     }
     
     private void CreateGhost()
     {
-        // Store the current recorded actions as a memory for this ghost
-        PlayerAction[] ghostMemory = recordedActions.ToArray();
-        ghostMemories.Add(ghostMemory);
-        
         // Remove oldest ghost if at max capacity (FIFO)
         if (activeGhosts.Count >= maxGhosts)
         {
@@ -392,12 +250,6 @@ public class PlayerController : MonoBehaviour
             {
                 Destroy(oldestGhost.gameObject);
             }
-            
-            // Also remove the oldest memory
-            if (ghostMemories.Count > 0)
-            {
-                ghostMemories.RemoveAt(0);
-            }
         }
         
         // Create ghost object
@@ -432,12 +284,12 @@ public class PlayerController : MonoBehaviour
             ghostCollider.isTrigger = true; // Make it non-solid
         }
         
-        // Set ghost to Ghost layer (layer 7)
-        ghostObject.layer = 7;
+        // Set ghost to Ghost layer
+        ghostObject.layer = LayerMask.NameToLayer("Ghost");
         
         // Add ghost controller
         GhostController ghostController = ghostObject.AddComponent<GhostController>();
-        ghostController.Initialize(ghostMemory, allowGhostPhysicsAfterFreeze, moveSpeed, jumpForce, rb.sharedMaterial);
+        ghostController.Initialize(recordedActions.ToArray(), allowGhostPhysicsAfterFreeze, moveSpeed, jumpForce, rb.sharedMaterial);
         activeGhosts.Add(ghostController);
     }
 
@@ -474,30 +326,8 @@ public class PlayerController : MonoBehaviour
     public void TakeDamage(float damage)
     {
         currentHealth -= damage;
-        
-        // Check for instant death from electricity (very high damage)
-        if (instantDeathFromElectricity && damage >= 999f)
-        {
-            // Instant death - respawn immediately
-            RespawnPlayer();
-            currentHealth = maxHealth;
-            return;
-        }
-        
-        // Check for instant death from spike (30 damage)
-        if (instantDeathFromSpike && damage >= 30f)
-        {
-            // Instant death from spike - respawn immediately
-            RespawnPlayer();
-            currentHealth = maxHealth;
-            return;
-        }
-        
         if (currentHealth <= 0)
         {
-            // Clear poison when player dies
-            SetPoisoned(false);
-            
             // Automatic respawn when health reaches zero
             RespawnPlayer();
             currentHealth = maxHealth;
@@ -536,17 +366,5 @@ public class PlayerController : MonoBehaviour
             RespawnPlayer();
             currentHealth = maxHealth;
         }
-    }
-
-    public bool IsPoisoned()
-    {
-        return isPoisoned;
-    }
-
-    public void SetPoisoned(bool poisoned)
-    {
-        isPoisoned = poisoned;
-        
-        Debug.Log($"[PlayerController] Poison status: {poisoned}");
     }
 } 
