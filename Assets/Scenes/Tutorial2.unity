@@ -260,6 +260,63 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   player: {fileID: 402796175}
   fillImage: {fileID: 253379423}
+--- !u!1001 &257583591
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    m_TransformParent: {fileID: 0}
+    m_Modifications:
+    - target: {fileID: 109801092167864245, guid: ddd9a24858475cd41a87308ab7150036, type: 3}
+      propertyPath: m_Name
+      value: Music Player
+      objectReference: {fileID: 0}
+    - target: {fileID: 109801092167864247, guid: ddd9a24858475cd41a87308ab7150036, type: 3}
+      propertyPath: m_RootOrder
+      value: 11
+      objectReference: {fileID: 0}
+    - target: {fileID: 109801092167864247, guid: ddd9a24858475cd41a87308ab7150036, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: -3.3498425
+      objectReference: {fileID: 0}
+    - target: {fileID: 109801092167864247, guid: ddd9a24858475cd41a87308ab7150036, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 0.60832787
+      objectReference: {fileID: 0}
+    - target: {fileID: 109801092167864247, guid: ddd9a24858475cd41a87308ab7150036, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: -0.004799558
+      objectReference: {fileID: 0}
+    - target: {fileID: 109801092167864247, guid: ddd9a24858475cd41a87308ab7150036, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 109801092167864247, guid: ddd9a24858475cd41a87308ab7150036, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 109801092167864247, guid: ddd9a24858475cd41a87308ab7150036, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 109801092167864247, guid: ddd9a24858475cd41a87308ab7150036, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 109801092167864247, guid: ddd9a24858475cd41a87308ab7150036, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 109801092167864247, guid: ddd9a24858475cd41a87308ab7150036, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 109801092167864247, guid: ddd9a24858475cd41a87308ab7150036, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: ddd9a24858475cd41a87308ab7150036, type: 3}
 --- !u!1 &269288022
 GameObject:
   m_ObjectHideFlags: 0
@@ -3484,11 +3541,12 @@ MonoBehaviour:
   tileSize: 1
   tilesBelowPlatform: 10
   maxGhosts: 3
-  startPosition: {x: -3.38, y: -2.55, z: 0}
+  startPosition: {x: -9.5, y: -2.77, z: 0}
   ghostPrefab: {fileID: 0}
   allowGhostPhysicsAfterFreeze: 1
   instantDeathFromElectricity: 1
   instantDeathFromSpike: 1
+  instantDeathFromAcid: 1
 --- !u!95 &402796176
 Animator:
   serializedVersion: 5
@@ -3718,6 +3776,7 @@ MonoBehaviour:
   activeTime: 3
   inactiveTime: 2
   startActive: 1
+  collisionSize: {x: 0.6, y: 0.6}
   activeColor: {r: 1, g: 0, b: 0, a: 1}
   inactiveColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
   spikeEffect: {fileID: 0}
