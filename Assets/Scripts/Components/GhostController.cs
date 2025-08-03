@@ -1,4 +1,5 @@
 using UnityEngine;
+using System.Collections;
 
 public class GhostController : MonoBehaviour
 {
@@ -32,6 +33,14 @@ public class GhostController : MonoBehaviour
     [SerializeField] private GameObject fallingGroundPrefab;
     private Vector2 lastBulletDirection = Vector2.right;
     
+    [Header("Health System")]
+    [SerializeField] private float maxHealth = 100f;
+    [SerializeField] private float currentHealth = 100f;
+    [SerializeField] private float totalAcidDamage = 100f;
+    [SerializeField] private int acidDamageTicks = 10;
+    [SerializeField] private float acidTickInterval = 0.5f;
+    private bool isPoisoned = false;
+    
     // POSITION-BASED REPLAY SYSTEM
     private bool usePositionBasedReplay = true; // Use position-based replay for perfect accuracy
     private float replaySpeed = 1f; // Can be adjusted for slow-motion effects
@@ -56,6 +65,9 @@ public class GhostController : MonoBehaviour
         hasBeenHitByElectricity = false;
         hasBeenHitBySpike = false;
         hasBeenHitByAcid = diedFromAcid;
+        
+        // Initialize health
+        currentHealth = maxHealth;
         
         Debug.Log($"[GhostController] Ghost {gameObject.name} initialized with diedFromAcid={diedFromAcid}, hasBeenHitByAcid={hasBeenHitByAcid}");
         
@@ -454,14 +466,32 @@ public class GhostController : MonoBehaviour
     {
         Debug.Log($"[GhostController] Trigger entered with: {other.name}, layer: {other.gameObject.layer}, hasBeenHitByAcid={hasBeenHitByAcid}");
         
-        // Check if hit by electricity projectile
-        Projectile projectile = other.GetComponent<Projectile>();
-        if (projectile != null && !hasBeenHitByElectricity)
+        // Check if hit by acid projectile
+        AcidProjectile acidProjectile = other.GetComponent<AcidProjectile>();
+        if (acidProjectile != null && !hasBeenHitByAcid)
         {
-            Debug.Log($"[GhostController] Hit by projectile! Transforming into reflector...");
-            hasBeenHitByElectricity = true;
-            lastBulletDirection = projectile.GetDirection(); // Store the bullet direction
-            TransformIntoReflector(projectile.transform.position, projectile.GetDirection());
+            // Check if already poisoned - if so, don't start damage
+            if (IsPoisoned())
+            {
+                Debug.Log($"[GhostController] Already poisoned, ignoring acid projectile hit");
+                return;
+            }
+            
+            Debug.Log($"[GhostController] Hit by acid projectile! Taking damage and transforming into acid explosion...");
+            hasBeenHitByAcid = true;
+            TakeAcidDamage();
+        }
+        // Check if hit by electricity projectile
+        else if (!hasBeenHitByElectricity)
+        {
+            Projectile projectile = other.GetComponent<Projectile>();
+            if (projectile != null)
+            {
+                Debug.Log($"[GhostController] Hit by projectile! Transforming into reflector...");
+                hasBeenHitByElectricity = true;
+                lastBulletDirection = projectile.GetDirection(); // Store the bullet direction
+                TransformIntoReflector(projectile.transform.position, projectile.GetDirection());
+            }
         }
         // Check if hit by ACTIVE spike
         else if (!hasBeenHitBySpike)
@@ -534,14 +564,32 @@ public class GhostController : MonoBehaviour
     {
         Debug.Log($"[GhostController] Collision with: {collision.gameObject.name}, layer: {collision.gameObject.layer}");
         
-        // Check if hit by electricity projectile
-        Projectile projectile = collision.gameObject.GetComponent<Projectile>();
-        if (projectile != null && !hasBeenHitByElectricity)
+        // Check if hit by acid projectile
+        AcidProjectile acidProjectile = collision.gameObject.GetComponent<AcidProjectile>();
+        if (acidProjectile != null && !hasBeenHitByAcid)
         {
-            Debug.Log($"[GhostController] Hit by projectile via collision! Transforming into reflector...");
-            hasBeenHitByElectricity = true;
-            lastBulletDirection = projectile.GetDirection(); // Store the bullet direction
-            TransformIntoReflector(projectile.transform.position, projectile.GetDirection());
+            // Check if already poisoned - if so, don't start damage
+            if (IsPoisoned())
+            {
+                Debug.Log($"[GhostController] Already poisoned, ignoring acid projectile collision");
+                return;
+            }
+            
+            Debug.Log($"[GhostController] Hit by acid projectile via collision! Taking damage and transforming into acid explosion...");
+            hasBeenHitByAcid = true;
+            TakeAcidDamage();
+        }
+        // Check if hit by electricity projectile
+        else if (!hasBeenHitByElectricity)
+        {
+            Projectile projectile = collision.gameObject.GetComponent<Projectile>();
+            if (projectile != null)
+            {
+                Debug.Log($"[GhostController] Hit by projectile via collision! Transforming into reflector...");
+                hasBeenHitByElectricity = true;
+                lastBulletDirection = projectile.GetDirection(); // Store the bullet direction
+                TransformIntoReflector(projectile.transform.position, projectile.GetDirection());
+            }
         }
         // Check if hit by ACTIVE spike
         else if (!hasBeenHitBySpike)
@@ -907,6 +955,119 @@ public class GhostController : MonoBehaviour
     {
         hasBeenHitByAcid = false;
         Debug.Log($"[GhostController] Acid hit state reset for {gameObject.name}");
+    }
+    
+    /// <summary>
+    /// Check if the ghost is poisoned
+    /// </summary>
+    /// <returns>True if poisoned</returns>
+    public bool IsPoisoned()
+    {
+        return isPoisoned;
+    }
+    
+    /// <summary>
+    /// Set the poisoned status
+    /// </summary>
+    /// <param name="poisoned">Whether the ghost is poisoned</param>
+    public void SetPoisoned(bool poisoned)
+    {
+        isPoisoned = poisoned;
+        Debug.Log($"[GhostController] Poisoned status set to: {poisoned}");
+    }
+    
+    /// <summary>
+    /// Take acid damage and potentially trigger transformation
+    /// </summary>
+    public void TakeAcidDamage()
+    {
+        if (isPoisoned)
+        {
+            Debug.Log($"[GhostController] Already poisoned, ignoring acid damage");
+            return;
+        }
+        
+        Debug.Log($"[GhostController] Starting acid damage over time");
+        SetPoisoned(true);
+        StartCoroutine(ApplyAcidDamageOverTime());
+    }
+    
+    /// <summary>
+    /// Take direct acid damage (used by acid pools)
+    /// </summary>
+    /// <param name="damage">Amount of damage to take</param>
+    public void TakeDirectAcidDamage(float damage)
+    {
+        currentHealth -= damage;
+        Debug.Log($"[GhostController] Took {damage} direct acid damage. Health: {currentHealth}");
+        
+        // Flash ghost with acid color
+        StartCoroutine(FlashGhostWithAcidColor());
+        
+        if (currentHealth <= 0)
+        {
+            Debug.Log($"[GhostController] Ghost health depleted, triggering acid explosion transformation");
+            SetPoisoned(false);
+            TransformIntoAcidExplosion();
+        }
+    }
+    
+    /// <summary>
+    /// Apply acid damage over time like the player system
+    /// </summary>
+    private IEnumerator ApplyAcidDamageOverTime()
+    {
+        float damagePerTick = totalAcidDamage / acidDamageTicks;
+        
+        for (int i = 0; i < acidDamageTicks; i++)
+        {
+            if (!isPoisoned)
+            {
+                Debug.Log($"[GhostController] No longer poisoned, stopping acid damage");
+                break;
+            }
+            
+            currentHealth -= damagePerTick;
+            Debug.Log($"[GhostController] Acid tick {i + 1}/{acidDamageTicks}: {damagePerTick} damage. Health: {currentHealth}");
+            
+            // Flash ghost with acid color
+            StartCoroutine(FlashGhostWithAcidColor());
+            
+            if (currentHealth <= 0)
+            {
+                Debug.Log($"[GhostController] Ghost health depleted, triggering acid explosion transformation");
+                SetPoisoned(false);
+                TransformIntoAcidExplosion();
+                yield break;
+            }
+            
+            yield return new WaitForSeconds(acidTickInterval);
+        }
+        
+        // Clear poison status when damage is complete
+        if (isPoisoned)
+        {
+            SetPoisoned(false);
+        }
+    }
+    
+    /// <summary>
+    /// Flash the ghost with acid color when taking damage
+    /// </summary>
+    private IEnumerator FlashGhostWithAcidColor()
+    {
+        if (spriteRenderer != null)
+        {
+            Color originalColor = spriteRenderer.color;
+            Color acidColor = Color.green;
+            
+            // Flash to acid color
+            spriteRenderer.color = acidColor;
+            yield return new WaitForSeconds(0.1f);
+            
+            // Return to original color
+            spriteRenderer.color = originalColor;
+        }
     }
     
     /// <summary>

@@ -456,6 +456,9 @@ public class PlayerController : MonoBehaviour
             // Clear poison when player dies
             SetPoisoned(false);
             
+            // Reset all acid pools when player dies
+            AcidPool.ResetAllPools();
+            
             // Automatic respawn when health reaches zero
             RespawnPlayer();
             currentHealth = maxHealth;
