@@ -8,7 +8,7 @@ public class PlayerController : MonoBehaviour
     [SerializeField] private float jumpForce = 14f;
     
     [Header("Ground Check")]
-    [SerializeField] private LayerMask groundLayer = 1;
+    [SerializeField] private LayerMask groundLayer = 256; // Layer 8 (Ground)
     [SerializeField] private float groundCheckDistance = 0.1f;
     
     [Header("Health")]
@@ -27,8 +27,9 @@ public class PlayerController : MonoBehaviour
     [SerializeField] private GameObject ghostPrefab;
     [SerializeField] private bool allowGhostPhysicsAfterFreeze = false;
     
-    [Header("Electricity Death")]
+    [Header("Death Types")]
     [SerializeField] private bool instantDeathFromElectricity = true;
+    [SerializeField] private bool instantDeathFromSpike = true;
     
     private Rigidbody2D rb;
     private bool isGrounded;
@@ -74,8 +75,8 @@ public class PlayerController : MonoBehaviour
         currentHealth = maxHealth;
         gameStartTime = Time.time;
         
-        // Set player to Player layer
-        gameObject.layer = LayerMask.NameToLayer("Player");
+        // Set player to Player layer (layer 6)
+        gameObject.layer = 6;
         
         // Prevent rotation
         if (rb != null)
@@ -193,6 +194,12 @@ public class PlayerController : MonoBehaviour
             ReflectorManager.Instance.ClearAllReflectors();
         }
         
+        // Clear all falling grounds
+        if (FallingBlockManager.Instance != null)
+        {
+            FallingBlockManager.Instance.ClearAllFallingGrounds();
+        }
+        
         // Clear all bullets from the screen
         Projectile[] allProjectiles = FindObjectsOfType<Projectile>();
         foreach (Projectile projectile in allProjectiles)
@@ -233,12 +240,13 @@ public class PlayerController : MonoBehaviour
             }
         }
         
-        // Reset all ghosts' electricity hit state
+        // Reset all ghosts' electricity and spike hit states
         foreach (GhostController ghost in activeGhosts)
         {
             if (ghost != null)
             {
                 ghost.ResetElectricityHitState();
+                ghost.ResetSpikeHitState();
             }
         }
         
@@ -300,8 +308,8 @@ public class PlayerController : MonoBehaviour
             ghostCollider.isTrigger = true; // Make it non-solid
         }
         
-        // Set ghost to Ghost layer
-        ghostObject.layer = LayerMask.NameToLayer("Ghost");
+        // Set ghost to Ghost layer (layer 7)
+        ghostObject.layer = 7;
         
         // Add ghost controller with the stored memory
         GhostController ghostController = ghostObject.AddComponent<GhostController>();
@@ -366,8 +374,8 @@ public class PlayerController : MonoBehaviour
             ghostCollider.isTrigger = true; // Make it non-solid
         }
         
-        // Set ghost to Ghost layer
-        ghostObject.layer = LayerMask.NameToLayer("Ghost");
+        // Set ghost to Ghost layer (layer 7)
+        ghostObject.layer = 7;
         
         // Add ghost controller
         GhostController ghostController = ghostObject.AddComponent<GhostController>();
@@ -391,6 +399,9 @@ public class PlayerController : MonoBehaviour
         
         // Debug visualization
         Debug.DrawRay(bottomCenter, Vector2.down * groundCheckDistance, isGrounded ? Color.green : Color.red);
+        
+        // Debug ground detection for player
+        Debug.Log($"[PlayerController] Ground check: bottomCenter={bottomCenter}, isGrounded={isGrounded}, hit.collider={hit.collider?.name}, layer={hit.collider?.gameObject.layer ?? 0}, groundLayer={groundLayer}");
     }
     
     public void TakeDamage(float damage)
@@ -401,6 +412,15 @@ public class PlayerController : MonoBehaviour
         if (instantDeathFromElectricity && damage >= 999f)
         {
             // Instant death - respawn immediately
+            RespawnPlayer();
+            currentHealth = maxHealth;
+            return;
+        }
+        
+        // Check for instant death from spike (30 damage)
+        if (instantDeathFromSpike && damage >= 30f)
+        {
+            // Instant death from spike - respawn immediately
             RespawnPlayer();
             currentHealth = maxHealth;
             return;

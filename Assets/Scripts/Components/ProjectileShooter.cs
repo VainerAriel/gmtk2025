@@ -73,10 +73,10 @@ public class ProjectileShooter : MonoBehaviour
             rb.simulated = true; // Enable physics simulation
         }
         
-        // Ensure it's on the Ground layer for proper collision
-        if (gameObject.layer != LayerMask.NameToLayer("Ground"))
+        // Ensure it's on the ProjectileShooter layer (layer 12) for proper collision
+        if (gameObject.layer != 12)
         {
-            gameObject.layer = LayerMask.NameToLayer("Ground");
+            gameObject.layer = 12;
         }
     }
     

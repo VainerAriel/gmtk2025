@@ -45,23 +45,22 @@ public class Projectile : MonoBehaviour
     /// </summary>
     private void SetupCollisionLayers()
     {
-        // Include Ground layer for collision (so bullets can hit ground and get destroyed)
-        int groundLayer = LayerMask.NameToLayer("Ground");
-        if (groundLayer != -1)
-        {
-            collisionLayers = collisionLayers | (1 << groundLayer);
-        }
+        // Set up collision layers according to the new layer system:
+        // Ground = layer 8, Player = layer 6, Ghost = layer 7, Reflect = layer 11
+        int groundLayer = 8;
+        int playerLayer = 6;
+        int ghostLayer = 7;
+        int reflectLayer = 11;
         
-        // Set the projectile to the Projectile layer if it exists
-        int projectileLayer = LayerMask.NameToLayer("Projectile");
-        if (projectileLayer != -1)
-        {
-            gameObject.layer = projectileLayer;
-        }
+        // Set collision layers to include ground, player, ghost, and reflect
+        collisionLayers = (1 << groundLayer) | (1 << playerLayer) | (1 << ghostLayer) | (1 << reflectLayer);
+        
+        // Set the projectile to the Projectile layer (layer 10)
+        gameObject.layer = 10;
         
         if (debugMode)
         {
-            Debug.Log($"[Projectile] Collision layers set to: {collisionLayers.value}, Layer: {LayerMask.LayerToName(gameObject.layer)}");
+            Debug.Log($"[Projectile] Collision layers set to: {collisionLayers.value}, Layer: {gameObject.layer}");
         }
     }
     
@@ -218,8 +217,8 @@ public class Projectile : MonoBehaviour
             return;
         }
         
-        // Check if it's ground collision
-        if (hit.collider.gameObject.layer == LayerMask.NameToLayer("Ground"))
+        // Check if it's ground collision (layer 8)
+        if (hit.collider.gameObject.layer == 8)
         {
             if (debugMode)
             {

@@ -122,6 +122,12 @@ public class TilemapSpikeManager : MonoBehaviour
         isActive = active;
         UpdateSpikeVisuals();
         
+        // If becoming active, check for overlapping objects
+        if (active)
+        {
+            CheckForOverlappingObjects();
+        }
+        
         if (debugMode)
         {
             Debug.Log($"[TilemapSpikeManager] {gameObject.name} set to {(active ? "ACTIVE" : "INACTIVE")}");
@@ -147,6 +153,11 @@ public class TilemapSpikeManager : MonoBehaviour
     {
         if (!isActive) return; // Only damage when active
         
+        if (debugMode)
+        {
+            Debug.Log($"[TilemapSpikeManager] {gameObject.name} OnTriggerEnter2D with: {other.name}");
+        }
+        
         PlayerController player = other.GetComponent<PlayerController>();
         if (player != null)
         {
@@ -166,6 +177,89 @@ public class TilemapSpikeManager : MonoBehaviour
             if (spikeSound != null && audioSource != null)
             {
                 audioSource.PlayOneShot(spikeSound);
+            }
+        }
+        
+        // Check for ghost collision
+        GhostController ghost = other.GetComponent<GhostController>();
+        if (ghost != null)
+        {
+            if (debugMode)
+            {
+                Debug.Log($"[TilemapSpikeManager] {gameObject.name} hit ghost, triggering transformation");
+            }
+            
+            // The ghost will handle its own transformation
+        }
+    }
+    
+    private void CheckForOverlappingObjects()
+    {
+        if (debugMode)
+        {
+            Debug.Log($"[TilemapSpikeManager] {gameObject.name} checking for overlapping objects...");
+        }
+        
+        // Get all colliders overlapping with this tilemap spike manager
+        Collider2D[] overlappingColliders = new Collider2D[10];
+        ContactFilter2D filter = new ContactFilter2D();
+        filter.useTriggers = true;
+        filter.useLayerMask = false;
+        
+        // Use the tilemap's collider or create a temporary one for overlap detection
+        Collider2D tilemapCollider = GetComponent<Collider2D>();
+        if (tilemapCollider == null)
+        {
+            // If no collider, create a temporary one for overlap detection
+            BoxCollider2D tempCollider = gameObject.AddComponent<BoxCollider2D>();
+            tempCollider.isTrigger = true;
+            tempCollider.size = new Vector2(10f, 10f); // Large enough to cover the tilemap area
+            
+            int count = tempCollider.OverlapCollider(filter, overlappingColliders);
+            
+            if (debugMode)
+            {
+                Debug.Log($"[TilemapSpikeManager] {gameObject.name} found {count} overlapping colliders");
+            }
+            
+            for (int i = 0; i < count; i++)
+            {
+                Collider2D other = overlappingColliders[i];
+                if (other != null && other != tempCollider)
+                {
+                    if (debugMode)
+                    {
+                        Debug.Log($"[TilemapSpikeManager] {gameObject.name} overlapping with: {other.name}");
+                    }
+                    // Simulate trigger enter for overlapping objects
+                    OnTriggerEnter2D(other);
+                }
+            }
+            
+            // Remove the temporary collider
+            DestroyImmediate(tempCollider);
+        }
+        else
+        {
+            int count = tilemapCollider.OverlapCollider(filter, overlappingColliders);
+            
+            if (debugMode)
+            {
+                Debug.Log($"[TilemapSpikeManager] {gameObject.name} found {count} overlapping colliders");
+            }
+            
+            for (int i = 0; i < count; i++)
+            {
+                Collider2D other = overlappingColliders[i];
+                if (other != null && other != tilemapCollider)
+                {
+                    if (debugMode)
+                    {
+                        Debug.Log($"[TilemapSpikeManager] {gameObject.name} overlapping with: {other.name}");
+                    }
+                    // Simulate trigger enter for overlapping objects
+                    OnTriggerEnter2D(other);
+                }
             }
         }
     }

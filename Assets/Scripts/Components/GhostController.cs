@@ -17,15 +17,17 @@ public class GhostController : MonoBehaviour
     [Header("Ghost Settings")]
     [SerializeField] private float ghostAlpha = 0.5f;
     [SerializeField] private Color ghostColor = new Color(1f, 1f, 1f, 0.5f);
-    [SerializeField] private LayerMask groundLayer = 1 | (1 << 8); // Default layer + Ground layer
+    [SerializeField] private LayerMask groundLayer = 256; // Same as player - Layer 8 (Ground)
     [SerializeField] private float groundCheckDistance = 0.1f;
     [SerializeField] private string sortingLayerName = "Player"; // Sorting layer for visual rendering
     [SerializeField] private int sortingOrder = 0; // Order within the sorting layer
     
     private PhysicsMaterial2D originalMaterial;
     
-    [Header("Electricity Transformation")]
+    [Header("Transformation")]
     [SerializeField] private bool hasBeenHitByElectricity = false;
+    [SerializeField] private bool hasBeenHitBySpike = false;
+    [SerializeField] private GameObject fallingGroundPrefab; // Fallback reference to the FallingGround prefab
     private Vector2 lastBulletDirection = Vector2.right; // Store the last bullet direction for reflector logic
     
     public void Initialize(PlayerController.PlayerAction[] actions, bool allowPhysicsAfterFreeze, float moveSpeed, float jumpForce, PhysicsMaterial2D playerMaterial)
@@ -34,12 +36,45 @@ public class GhostController : MonoBehaviour
         this.allowPhysicsAfterFreeze = allowPhysicsAfterFreeze;
         this.moveSpeed = moveSpeed;
         this.jumpForce = jumpForce;
-        ghostStartTime = Time.time;
+        // FIXED: Use the same time reference as the player's original recording session
+        // The ghost should start replaying at the same time the player started recording
+        // So we calculate the original game start time by subtracting the last action's timestamp from current time
+        if (actions != null && actions.Length > 0)
+        {
+            float lastActionTime = actions[actions.Length - 1].timestamp;
+            ghostStartTime = Time.time - lastActionTime;
+            Debug.Log($"[GhostController] Time sync: current time={Time.time}, last action time={lastActionTime}, ghost start time={ghostStartTime}");
+        }
+        else
+        {
+            ghostStartTime = Time.time;
+        }
         currentActionIndex = 0;
         isReplaying = true;
         hasJumped = false;
         hasBeenHitByElectricity = false; // Reset electricity hit state
+        hasBeenHitBySpike = false; // Reset spike hit state
         
+        // Debug initialization
+        Debug.Log($"[GhostController] Initialized with {actions?.Length ?? 0} actions, moveSpeed={moveSpeed}, jumpForce={jumpForce}");
+        if (actions != null && actions.Length > 0)
+        {
+            int jumpCount = 0;
+            foreach (var action in actions)
+            {
+                if (action.jumpPressed) jumpCount++;
+            }
+            Debug.Log($"[GhostController] Recorded actions contain {jumpCount} jump actions");
+        }
+        BoxCollider2D ghostCollider = GetComponent<BoxCollider2D>();
+        BoxCollider2D playerCollider = FindObjectOfType<PlayerController>().GetComponent<BoxCollider2D>();
+
+        if (ghostCollider != null && playerCollider != null)
+        {
+            ghostCollider.size = playerCollider.size;
+            ghostCollider.offset = playerCollider.offset;
+        }
+
         // Get or add required components
         rb = GetComponent<Rigidbody2D>();
         if (rb == null)
@@ -56,6 +91,16 @@ public class GhostController : MonoBehaviour
         rb.interpolation = RigidbodyInterpolation2D.None; // Same as player
         rb.sleepMode = RigidbodySleepMode2D.StartAwake; // Same as player
         rb.constraints = RigidbodyConstraints2D.FreezeRotation; // Same as player
+        rb.bodyType = RigidbodyType2D.Dynamic; // Ensure same body type as player
+        
+        // Debug rigidbody setup
+        Debug.Log($"[GhostController] Rigidbody setup: gravityScale={rb.gravityScale}, mass={rb.mass}, bodyType={rb.bodyType}, isKinematic={rb.isKinematic}");
+        
+        // Check if rigidbody is kinematic (this would prevent jumping)
+        if (rb.isKinematic)
+        {
+            Debug.LogError($"[GhostController] WARNING: Rigidbody is kinematic! This will prevent jumping!");
+        }
         
         // Use the same physics material as the player
         if (playerMaterial != null)
@@ -89,7 +134,7 @@ public class GhostController : MonoBehaviour
         }
         
         // Set up collider for physics mode - EXACTLY like the player
-        BoxCollider2D ghostCollider = GetComponent<BoxCollider2D>();
+        
         if (ghostCollider != null)
         {
             // Make it solid so it can interact with the real world
@@ -97,30 +142,66 @@ public class GhostController : MonoBehaviour
             ghostCollider.density = 1f; // Same as player
             ghostCollider.usedByEffector = false; // Same as player
             ghostCollider.usedByComposite = false; // Same as player
-            ghostCollider.offset = Vector2.zero; // Same as player
+            ghostCollider.sharedMaterial = null; // Same as player (no shared material on collider)
+            
+            // Debug collider setup
+            Debug.Log($"[GhostController] Collider setup: isTrigger={ghostCollider.isTrigger}, size={ghostCollider.size}, offset={ghostCollider.offset}");
+        }
+        else
+        {
+            Debug.LogError($"[GhostController] No BoxCollider2D found on ghost!");
         }
         
-        // Ensure ghost is on Ghost layer
-        gameObject.layer = LayerMask.NameToLayer("Ghost");
+        // Add a separate trigger collider for spike detection
+        CircleCollider2D triggerCollider = gameObject.GetComponent<CircleCollider2D>();
+        if (triggerCollider == null)
+        {
+            triggerCollider = gameObject.AddComponent<CircleCollider2D>();
+        }
+        triggerCollider.isTrigger = true;
+        triggerCollider.radius = 0.6f; // Slightly larger than the ghost
+        triggerCollider.offset = Vector2.zero;
         
-        // Set ground layer mask to detect Default and Ground layers
-        groundLayer = LayerMask.GetMask("Default", "Ground");
+        // Ensure ghost is on Ghost layer (layer 7)
+        gameObject.layer = 7;
+        Debug.Log($"[GhostController] Set to Ghost layer: {gameObject.layer}");
+        
+        // Ground layer is now set correctly in the inspector field
         
         // Set initial position
         if (recordedActions.Length > 0)
         {
             transform.position = recordedActions[0].position;
+            Debug.Log($"[GhostController] Set initial position to: {transform.position}");
+            
+            // Compare with player position
+            PlayerController player = FindObjectOfType<PlayerController>();
+            if (player != null)
+            {
+                Debug.Log($"[GhostController] Player position: {player.transform.position}, Ghost position: {transform.position}");
+            }
         }
     }
     
     public void RestartReplay()
     {
         // Reset replay state
-        ghostStartTime = Time.time;
+        // FIXED: Use the same time reference as the original recording session
+        if (recordedActions != null && recordedActions.Length > 0)
+        {
+            float lastActionTime = recordedActions[recordedActions.Length - 1].timestamp;
+            ghostStartTime = Time.time - lastActionTime;
+            Debug.Log($"[GhostController] Restart replay: current time={Time.time}, last action time={lastActionTime}, ghost start time={ghostStartTime}");
+        }
+        else
+        {
+            ghostStartTime = Time.time;
+        }
         currentActionIndex = 0;
         isReplaying = true;
         hasJumped = false;
         hasBeenHitByElectricity = false; // Reset electricity hit state
+        hasBeenHitBySpike = false; // Reset spike hit state
         
         // Reset rigidbody
         if (rb != null)
@@ -170,6 +251,7 @@ public class GhostController : MonoBehaviour
         if (isGrounded)
         {
             hasJumped = false;
+            Debug.Log($"[GhostController] Reset jump - now grounded");
         }
         
         if (recordedActions == null || recordedActions.Length == 0 || currentActionIndex >= recordedActions.Length)
@@ -186,6 +268,7 @@ public class GhostController : MonoBehaviour
         if (currentTime >= currentAction.timestamp)
         {
             // Apply the recorded action
+            Debug.Log($"[GhostController] Applying action at time {currentTime}: jumpPressed={currentAction.jumpPressed}, horizontalInput={currentAction.horizontalInput}");
             ApplyAction(currentAction);
             currentActionIndex++;
         }
@@ -193,52 +276,114 @@ public class GhostController : MonoBehaviour
         // Update visual appearance
         UpdateVisualAppearance();
         
+        // Debug: Track velocity to see if jump force is being applied
+        if (rb != null && rb.velocity.y > 0)
+        {
+            Debug.Log($"[GhostController] Current velocity: {rb.velocity}");
+        }
+        
         // Debug: Press T to test transformation
         if (Input.GetKeyDown(KeyCode.T))
         {
             Debug.Log($"[GhostController] Manual test transformation triggered by T key");
             TransformIntoReflector(transform.position, Vector2.right); // Default to right direction for testing
         }
+        
+        // Debug: Press Y to test spike transformation
+        if (Input.GetKeyDown(KeyCode.Y))
+        {
+            Debug.Log($"[GhostController] Manual test spike transformation triggered by Y key");
+            TransformIntoFallingGround();
+        }
+        
+        // Debug: Press U to test spike transformation with state check
+        if (Input.GetKeyDown(KeyCode.U))
+        {
+            Debug.Log($"[GhostController] Manual test spike transformation with state check triggered by U key");
+            if (!hasBeenHitBySpike)
+            {
+                hasBeenHitBySpike = true;
+                TransformIntoFallingGround();
+            }
+            else
+            {
+                Debug.Log($"[GhostController] Already hit by spike, resetting state and trying again");
+                hasBeenHitBySpike = false;
+                TransformIntoFallingGround();
+            }
+        }
     }
     
     private void CheckGrounded()
     {
-        // Get the ghost's collider to find the bottom position
+        // Get the ghost's collider to find the bottom position - EXACTLY like the player
         Collider2D ghostCollider = GetComponent<Collider2D>();
         if (ghostCollider == null) return;
         
-        // Calculate the bottom center of the ghost
+        // Calculate the bottom center of the ghost - EXACTLY like the player
         Vector2 bottomCenter = (Vector2)transform.position + ghostCollider.offset;
         bottomCenter.y -= ghostCollider.bounds.extents.y;
         
-        // Cast ray from bottom center downward
+        // Cast ray from bottom center downward - EXACTLY like the player
         RaycastHit2D hit = Physics2D.Raycast(bottomCenter, Vector2.down, groundCheckDistance, groundLayer);
         isGrounded = hit.collider != null;
         
-        // Debug visualization
+
+        
+        // Debug visualization - EXACTLY like the player
         Debug.DrawRay(bottomCenter, Vector2.down * groundCheckDistance, isGrounded ? Color.green : Color.red);
+        
+        // Debug ground detection
+        Debug.Log($"[GhostController] Ground check: bottomCenter={bottomCenter}, isGrounded={isGrounded}, hit.collider={(hit.collider != null ? hit.collider.name : "NULL")}, layer={hit.collider?.gameObject.layer ?? 0}, groundLayer.value={groundLayer.value}, groundCheckDistance={groundCheckDistance}");
+        
+        // If not grounded, let's check what's actually there
+        if (!isGrounded)
+        {
+            // Cast a longer ray to see what's below
+            RaycastHit2D[] allHits = Physics2D.RaycastAll(bottomCenter, Vector2.down, 2f);
+            Debug.Log($"[GhostController] No ground detected. All objects below: {allHits.Length} hits");
+            foreach (var rayHit in allHits)
+            {
+                Debug.Log($"[GhostController] Hit: {rayHit.collider.name} on layer {rayHit.collider.gameObject.layer} at distance {rayHit.distance}");
+            }
+        }
     }
     
     private void ApplyAction(PlayerController.PlayerAction action)
     {
-        // Use velocity-based movement instead of forces for better control
+        // Use velocity-based movement - EXACTLY like the player does
         if (rb != null)
         {
-            // Set horizontal velocity directly (like the player does)
+            // Set horizontal velocity directly - EXACTLY like the player does
             Vector2 velocity = rb.velocity;
             velocity.x = action.horizontalInput * moveSpeed; // Same speed as player
             rb.velocity = velocity;
             
-            // Handle jump if it was pressed and ghost is actually grounded (not just recorded as grounded)
+            // Handle jump if it was pressed and ghost is actually grounded - EXACTLY like the player
+            Debug.Log($"[GhostController] Checking jump: action.jumpPressed={action.jumpPressed}, isGrounded={isGrounded}, hasJumped={hasJumped}, rb.isKinematic={rb.isKinematic}");
             if (action.jumpPressed && isGrounded && !hasJumped)
             {
-                // Apply jump force (same as player)
-                rb.AddForce(Vector2.up * jumpForce, ForceMode2D.Impulse);
-                hasJumped = true;
+                // Apply jump force - EXACTLY like the player
+                Debug.Log($"[GhostController] JUMPING! action.jumpPressed: {action.jumpPressed}, isGrounded: {isGrounded}, hasJumped: {hasJumped}");
+                if (rb.isKinematic)
+                {
+                    Debug.LogError($"[GhostController] ERROR: Cannot jump - rigidbody is kinematic!");
+                }
+                else
+                {
+                    Debug.Log($"[GhostController] Applying jump force: {jumpForce} to rigidbody");
+                    rb.AddForce(Vector2.up * jumpForce, ForceMode2D.Impulse);
+                    hasJumped = true;
+                    Debug.Log($"[GhostController] Jump force applied. New velocity: {rb.velocity}, hasJumped: {hasJumped}");
+                }
+            }
+            else if (action.jumpPressed)
+            {
+                Debug.Log($"[GhostController] Jump conditions not met: action.jumpPressed: {action.jumpPressed}, isGrounded: {isGrounded}, hasJumped: {hasJumped}");
             }
         }
         
-        // Flip character sprite based on movement direction (like the player does)
+        // Flip character sprite based on movement direction - EXACTLY like the player does
         if (action.horizontalInput > 0)
         {
             transform.localScale = new Vector3(1, transform.localScale.y, transform.localScale.z); // Face right
@@ -322,7 +467,7 @@ public class GhostController : MonoBehaviour
     
     private void OnTriggerEnter2D(Collider2D other)
     {
-        Debug.Log($"[GhostController] Trigger entered with: {other.name}, layer: {LayerMask.LayerToName(other.gameObject.layer)}");
+        Debug.Log($"[GhostController] Trigger entered with: {other.name}, layer: {other.gameObject.layer}");
         
         // Check if hit by electricity projectile
         Projectile projectile = other.GetComponent<Projectile>();
@@ -333,19 +478,58 @@ public class GhostController : MonoBehaviour
             lastBulletDirection = projectile.GetDirection(); // Store the bullet direction
             TransformIntoReflector(projectile.transform.position, projectile.GetDirection());
         }
-        else if (projectile == null)
+        // Check if hit by spike
+        else if ((other.GetComponent<SpikeTile>() != null || other.GetComponent<TilemapSpikeManager>() != null) && !hasBeenHitBySpike)
         {
-            Debug.Log($"[GhostController] Hit by something without Projectile component: {other.name}");
+            Debug.Log($"[GhostController] Hit by spike! Transforming into falling ground...");
+            hasBeenHitBySpike = true;
+            TransformIntoFallingGround();
+        }
+        else if (projectile == null && other.GetComponent<SpikeTile>() == null && other.GetComponent<TilemapSpikeManager>() == null)
+        {
+            Debug.Log($"[GhostController] Hit by something without Projectile or SpikeTile/TilemapSpikeManager component: {other.name}");
         }
         else if (hasBeenHitByElectricity)
         {
             Debug.Log($"[GhostController] Already been hit by electricity, ignoring");
         }
+        else if (hasBeenHitBySpike)
+        {
+            Debug.Log($"[GhostController] Already been hit by spike, ignoring");
+        }
+    }
+    
+    // Test method to manually trigger spike transformation
+    public void TestSpikeTransformation()
+    {
+        Debug.Log($"[GhostController] Test spike transformation called");
+        if (!hasBeenHitBySpike)
+        {
+            hasBeenHitBySpike = true;
+            TransformIntoFallingGround();
+        }
+        else
+        {
+            Debug.Log($"[GhostController] Already hit by spike, resetting and trying again");
+            hasBeenHitBySpike = false;
+            TransformIntoFallingGround();
+        }
+    }
+    
+    private void OnTriggerStay2D(Collider2D other)
+    {
+        // Also check for spikes while staying in trigger
+        if ((other.GetComponent<SpikeTile>() != null || other.GetComponent<TilemapSpikeManager>() != null) && !hasBeenHitBySpike)
+        {
+            Debug.Log($"[GhostController] Staying in spike trigger! Transforming into falling ground...");
+            hasBeenHitBySpike = true;
+            TransformIntoFallingGround();
+        }
     }
     
     private void OnCollisionEnter2D(Collision2D collision)
     {
-        Debug.Log($"[GhostController] Collision with: {collision.gameObject.name}, layer: {LayerMask.LayerToName(collision.gameObject.layer)}");
+        Debug.Log($"[GhostController] Collision with: {collision.gameObject.name}, layer: {collision.gameObject.layer}");
         
         // Check if hit by electricity projectile
         Projectile projectile = collision.gameObject.GetComponent<Projectile>();
@@ -355,6 +539,13 @@ public class GhostController : MonoBehaviour
             hasBeenHitByElectricity = true;
             lastBulletDirection = projectile.GetDirection(); // Store the bullet direction
             TransformIntoReflector(projectile.transform.position, projectile.GetDirection());
+        }
+        // Check if hit by spike
+        else if ((collision.gameObject.GetComponent<SpikeTile>() != null || collision.gameObject.GetComponent<TilemapSpikeManager>() != null) && !hasBeenHitBySpike)
+        {
+            Debug.Log($"[GhostController] Hit by spike via collision! Transforming into falling ground...");
+            hasBeenHitBySpike = true;
+            TransformIntoFallingGround();
         }
     }
     
@@ -393,6 +584,79 @@ public class GhostController : MonoBehaviour
         else
         {
             Debug.LogError($"[GhostController] reflectorPrefab is null! Check ReflectorManager prefab assignments.");
+        }
+    }
+    
+    private void TransformIntoFallingGround()
+    {
+        Debug.Log($"[GhostController] TransformIntoFallingGround called");
+        
+        // Try to get the prefab from FallingBlockManager first
+        GameObject prefabToUse = null;
+        
+        if (FallingBlockManager.Instance != null)
+        {
+            prefabToUse = FallingBlockManager.Instance.GetFallingGroundPrefab();
+            if (prefabToUse != null)
+            {
+                Debug.Log($"[GhostController] Using FallingGround prefab from FallingBlockManager: {prefabToUse.name}");
+            }
+        }
+        
+        // Fallback to the inspector-assigned prefab
+        if (prefabToUse == null && fallingGroundPrefab != null)
+        {
+            prefabToUse = fallingGroundPrefab;
+            Debug.Log($"[GhostController] Using fallback FallingGround prefab from inspector: {prefabToUse.name}");
+        }
+        
+        if (prefabToUse != null)
+        {
+            // Calculate the spawn position at the ghost's position
+            Vector3 spawnPosition = transform.position;
+            
+            // Snap to nearest grid tile (assuming 1 unit grid size)
+            Vector3 snappedPosition = SnapToGrid(spawnPosition);
+            
+            Debug.Log($"[GhostController] Creating falling ground at spawn position {spawnPosition} -> snapped to {snappedPosition}");
+            
+            // Create the falling ground at the snapped grid position
+            GameObject fallingGround = Instantiate(prefabToUse, snappedPosition, transform.rotation);
+            
+            // Destroy the ghost
+            Destroy(gameObject);
+            
+            Debug.Log($"[GhostController] Ghost transformed into falling ground at grid position {snappedPosition}");
+        }
+        else
+        {
+            Debug.LogError($"[GhostController] FallingGround prefab is null! Please assign the FallingGround prefab in FallingBlockManager or the inspector.");
+            
+            // Create a simple falling ground as fallback
+            Debug.Log($"[GhostController] Creating fallback falling ground");
+            GameObject fallbackGround = new GameObject("FallbackFallingGround");
+            fallbackGround.transform.position = transform.position;
+            
+            // Add components
+            Rigidbody2D rb = fallbackGround.AddComponent<Rigidbody2D>();
+            rb.bodyType = RigidbodyType2D.Dynamic;
+            rb.gravityScale = 1f;
+            rb.constraints = RigidbodyConstraints2D.FreezeRotation;
+            
+            BoxCollider2D collider = fallbackGround.AddComponent<BoxCollider2D>();
+            collider.size = new Vector2(1f, 2f);
+            
+            SpriteRenderer renderer = fallbackGround.AddComponent<SpriteRenderer>();
+            renderer.color = new Color(0.5f, 0.3f, 0.2f, 1f);
+            renderer.sprite = GetComponent<SpriteRenderer>()?.sprite;
+            
+            // Set layer to Ground (layer 8)
+            fallbackGround.layer = 8;
+            
+            // Destroy the ghost
+            Destroy(gameObject);
+            
+            Debug.Log($"[GhostController] Created fallback falling ground");
         }
     }
     
@@ -586,12 +850,33 @@ public class GhostController : MonoBehaviour
     }
     
     /// <summary>
+    /// Manually trigger transformation into falling ground (for testing)
+    /// </summary>
+    public void ManualTransformIntoFallingGround()
+    {
+        if (!hasBeenHitBySpike)
+        {
+            hasBeenHitBySpike = true;
+            TransformIntoFallingGround();
+        }
+    }
+    
+    /// <summary>
     /// Reset the electricity hit state so the ghost can transform again
     /// </summary>
     public void ResetElectricityHitState()
     {
         hasBeenHitByElectricity = false;
         Debug.Log($"[GhostController] Electricity hit state reset for {gameObject.name}");
+    }
+    
+    /// <summary>
+    /// Reset the spike hit state so the ghost can transform again
+    /// </summary>
+    public void ResetSpikeHitState()
+    {
+        hasBeenHitBySpike = false;
+        Debug.Log($"[GhostController] Spike hit state reset for {gameObject.name}");
     }
     
     /// <summary>

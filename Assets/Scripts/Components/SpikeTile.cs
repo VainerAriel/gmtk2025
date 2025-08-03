@@ -38,6 +38,9 @@ public class SpikeTile : MonoBehaviour
             audioSource = gameObject.AddComponent<AudioSource>();
         }
         
+        // Set spike to layer 13
+        gameObject.layer = 13;
+        
         // Initialize spike state
         if (randomizeStart)
         {
@@ -52,7 +55,7 @@ public class SpikeTile : MonoBehaviour
         
         if (debugMode)
         {
-            Debug.Log($"[SpikeTile] {gameObject.name} initialized - Active: {isActive}, ActiveTime: {activeTime}s, InactiveTime: {inactiveTime}s");
+            Debug.Log($"[SpikeTile] {gameObject.name} initialized - Active: {isActive}, ActiveTime: {activeTime}s, InactiveTime: {inactiveTime}s, Layer: {gameObject.layer}");
         }
     }
     
@@ -92,6 +95,12 @@ public class SpikeTile : MonoBehaviour
         isActive = active;
         UpdateSpikeVisuals();
         
+        // If becoming active, check for overlapping objects
+        if (active)
+        {
+            CheckForOverlappingObjects();
+        }
+        
         if (debugMode)
         {
             Debug.Log($"[SpikeTile] {gameObject.name} set to {(active ? "ACTIVE" : "INACTIVE")}");
@@ -118,16 +127,23 @@ public class SpikeTile : MonoBehaviour
             spriteRenderer.color = currentColor;
         }
         
-        // Update collider
+        // Update collider - keep it enabled but use isTrigger to control damage
         if (spikeCollider != null)
         {
-            spikeCollider.enabled = isActive;
+            // Keep collider enabled but control damage through isActive flag
+            // This allows us to detect overlaps even when inactive
+            spikeCollider.enabled = true;
         }
     }
     
     private void OnTriggerEnter2D(Collider2D other)
     {
         if (!isActive) return; // Only damage when active
+        
+        if (debugMode)
+        {
+            Debug.Log($"[SpikeTile] {gameObject.name} OnTriggerEnter2D with: {other.name}");
+        }
         
         PlayerController player = other.GetComponent<PlayerController>();
         if (player != null)
@@ -148,6 +164,55 @@ public class SpikeTile : MonoBehaviour
             if (spikeSound != null && audioSource != null)
             {
                 audioSource.PlayOneShot(spikeSound);
+            }
+        }
+        
+        // Check for ghost collision
+        GhostController ghost = other.GetComponent<GhostController>();
+        if (ghost != null)
+        {
+            if (debugMode)
+            {
+                Debug.Log($"[SpikeTile] {gameObject.name} hit ghost, triggering transformation");
+            }
+            
+            // The ghost will handle its own transformation
+        }
+    }
+    
+    private void CheckForOverlappingObjects()
+    {
+        if (spikeCollider == null) return;
+        
+        if (debugMode)
+        {
+            Debug.Log($"[SpikeTile] {gameObject.name} checking for overlapping objects...");
+        }
+        
+        // Get all colliders overlapping with this spike (collider is always enabled now)
+        Collider2D[] overlappingColliders = new Collider2D[10];
+        ContactFilter2D filter = new ContactFilter2D();
+        filter.useTriggers = true;
+        filter.useLayerMask = false;
+        
+        int count = spikeCollider.OverlapCollider(filter, overlappingColliders);
+        
+        if (debugMode)
+        {
+            Debug.Log($"[SpikeTile] {gameObject.name} found {count} overlapping colliders");
+        }
+        
+        for (int i = 0; i < count; i++)
+        {
+            Collider2D other = overlappingColliders[i];
+            if (other != null && other != spikeCollider)
+            {
+                if (debugMode)
+                {
+                    Debug.Log($"[SpikeTile] {gameObject.name} overlapping with: {other.name}");
+                }
+                // Simulate trigger enter for overlapping objects
+                OnTriggerEnter2D(other);
             }
         }
     }

@@ -55,9 +55,12 @@ public class ReflectBlock : MonoBehaviour
             audioSource = gameObject.AddComponent<AudioSource>();
         }
         
+        // Set to Reflect layer (layer 11)
+        gameObject.layer = 11;
+        
         if (debugMode)
         {
-            Debug.Log($"[ReflectBlock] {gameObject.name} initialized with type: {reflectDirection}, useFirst: {useFirstDirection}, layer: {LayerMask.LayerToName(gameObject.layer)}");
+            Debug.Log($"[ReflectBlock] {gameObject.name} initialized with type: {reflectDirection}, useFirst: {useFirstDirection}, layer: {gameObject.layer}");
         }
     }
     
