@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.Tilemaps;
+using System.Collections.Generic;
 
 public class BreakableTilemap : MonoBehaviour
 {
@@ -17,6 +18,7 @@ public class BreakableTilemap : MonoBehaviour
     [SerializeField] private bool debugMode = false;
     
     private AudioSource audioSource;
+    private Dictionary<Vector3Int, TileBase> originalTiles = new Dictionary<Vector3Int, TileBase>();
     
     private void Start()
     {
@@ -47,6 +49,9 @@ public class BreakableTilemap : MonoBehaviour
         {
             Debug.Log($"[BreakableTilemap] {gameObject.name} initialized with tilemap: {(tilemap != null ? tilemap.name : "NULL")}");
         }
+        
+        // Store all original tiles for restoration
+        StoreOriginalTiles();
     }
     
     /// <summary>
@@ -136,6 +141,58 @@ public class BreakableTilemap : MonoBehaviour
             // Change the tile color to show warning
             tilemap.SetTileFlags(cellPosition, TileFlags.None);
             tilemap.SetColor(cellPosition, damagedColor);
+        }
+    }
+    
+    /// <summary>
+    /// Store all original tiles for later restoration
+    /// </summary>
+    private void StoreOriginalTiles()
+    {
+        if (tilemap == null) return;
+        
+        originalTiles.Clear();
+        
+        // Get all tiles in the tilemap
+        BoundsInt bounds = tilemap.cellBounds;
+        for (int x = bounds.xMin; x < bounds.xMax; x++)
+        {
+            for (int y = bounds.yMin; y < bounds.yMax; y++)
+            {
+                Vector3Int cellPos = new Vector3Int(x, y, 0);
+                TileBase tile = tilemap.GetTile(cellPos);
+                if (tile != null)
+                {
+                    originalTiles[cellPos] = tile;
+                }
+            }
+        }
+        
+        if (debugMode)
+        {
+            Debug.Log($"[BreakableTilemap] Stored {originalTiles.Count} original tiles");
+        }
+    }
+    
+    /// <summary>
+    /// Restore all tiles to their original state
+    /// </summary>
+    public void RestoreAllTiles()
+    {
+        if (tilemap == null) return;
+        
+        int restoredCount = 0;
+        
+        // Restore all original tiles
+        foreach (KeyValuePair<Vector3Int, TileBase> kvp in originalTiles)
+        {
+            tilemap.SetTile(kvp.Key, kvp.Value);
+            restoredCount++;
+        }
+        
+        if (debugMode)
+        {
+            Debug.Log($"[BreakableTilemap] Restored {restoredCount} tiles to original state");
         }
     }
 } 

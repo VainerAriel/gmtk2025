@@ -116,6 +116,21 @@ public class BreakableTilemapManager : MonoBehaviour
     }
     
     /// <summary>
+    /// Restore all tiles to their original state
+    /// </summary>
+    public void RestoreAllTiles()
+    {
+        if (breakableTilemap != null)
+        {
+            breakableTilemap.RestoreAllTiles();
+            if (debugMode)
+            {
+                Debug.Log($"[BreakableTilemapManager] Restored all tiles in tilemap: {breakableTilemap.name}");
+            }
+        }
+    }
+    
+    /// <summary>
     /// Get the number of registered tilemaps (always 1 or 0 for simplified version)
     /// </summary>
     /// <returns>Number of registered tilemaps</returns>

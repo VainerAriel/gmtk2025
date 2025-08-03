@@ -247,6 +247,12 @@ public class PlayerController : MonoBehaviour
             }
         }
         
+        // Restore all breakable tiles
+        if (BreakableTilemapManager.Instance != null)
+        {
+            BreakableTilemapManager.Instance.RestoreAllTiles();
+        }
+        
         // Reset all ghosts' electricity, spike, and acid hit states
         foreach (GhostController ghost in activeGhosts)
         {
