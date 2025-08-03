@@ -9,6 +9,7 @@ public class SpikeTile : MonoBehaviour
     [SerializeField] private float inactiveTime = 1f;
     [SerializeField] private bool startActive = true;
     [SerializeField] private bool randomizeStart = false;
+    [SerializeField] private Vector2 collisionSize = new Vector2(0.6f, 0.6f); // Size of the collision area
     
     [Header("Visual Effects")]
     [SerializeField] private Sprite activeSprite;
@@ -40,6 +41,9 @@ public class SpikeTile : MonoBehaviour
         
         // Set spike to layer 13
         gameObject.layer = 13;
+        
+        // Apply collision size to the collider
+        ApplyCollisionSize();
         
         // Initialize spike state
         if (randomizeStart)
@@ -107,6 +111,69 @@ public class SpikeTile : MonoBehaviour
         }
     }
     
+    private void ApplyCollisionSize()
+    {
+        if (spikeCollider == null) return;
+        
+        // Apply size to different collider types
+        if (spikeCollider is BoxCollider2D boxCollider)
+        {
+            boxCollider.size = collisionSize;
+        }
+        else if (spikeCollider is CircleCollider2D circleCollider)
+        {
+            circleCollider.radius = Mathf.Min(collisionSize.x, collisionSize.y) * 0.5f;
+        }
+        else if (spikeCollider is CapsuleCollider2D capsuleCollider)
+        {
+            capsuleCollider.size = collisionSize;
+        }
+        
+        if (debugMode)
+        {
+            Debug.Log($"[SpikeTile] {gameObject.name} collision size set to: {collisionSize}");
+        }
+    }
+    
+    /// <summary>
+    /// Check if the player is protected by falling ground from this spike
+    /// </summary>
+    /// <param name="player">The player controller</param>
+    /// <returns>True if the player is protected by falling ground</returns>
+    private bool IsPlayerProtectedByFallingGround(PlayerController player)
+    {
+        // Cast a ray from the spike position upward to check for falling ground
+        Vector2 rayStart = transform.position;
+        Vector2 rayDirection = Vector2.up;
+        float rayDistance = 2f; // Check up to 2 units above the spike
+        
+        RaycastHit2D[] hits = Physics2D.RaycastAll(rayStart, rayDirection, rayDistance);
+        
+        if (debugMode)
+        {
+            Debug.DrawRay(rayStart, rayDirection * rayDistance, Color.yellow, 1f);
+        }
+        
+        foreach (RaycastHit2D hit in hits)
+        {
+            // Check if we hit falling ground
+            if (hit.collider.CompareTag("FallingGround") || hit.collider.gameObject.layer == 8) // Layer 8 is Ground
+            {
+                // Check if the player is above this falling ground
+                if (player.transform.position.y > hit.collider.transform.position.y)
+                {
+                    if (debugMode)
+                    {
+                        Debug.Log($"[SpikeTile] {gameObject.name} found falling ground protection: {hit.collider.name}");
+                    }
+                    return true;
+                }
+            }
+        }
+        
+        return false;
+    }
+    
     private void UpdateSpikeVisuals()
     {
         if (spriteRenderer != null)
@@ -146,6 +213,16 @@ public class SpikeTile : MonoBehaviour
         PlayerController player = other.GetComponent<PlayerController>();
         if (player != null)
         {
+            // Check if there's falling ground protecting the player from the spike
+            if (IsPlayerProtectedByFallingGround(player))
+            {
+                if (debugMode)
+                {
+                    Debug.Log($"[SpikeTile] {gameObject.name} player is protected by falling ground, no damage dealt");
+                }
+                return; // Don't damage the player
+            }
+            
             if (debugMode)
             {
                 Debug.Log($"[SpikeTile] {gameObject.name} hit player, dealing {damage} damage");
@@ -298,6 +375,21 @@ public class SpikeTile : MonoBehaviour
         return isActive;
     }
     
+    /// <summary>
+    /// Set the collision size for this spike
+    /// </summary>
+    /// <param name="size">New collision size</param>
+    public void SetCollisionSize(Vector2 size)
+    {
+        collisionSize = size;
+        ApplyCollisionSize();
+        
+        if (debugMode)
+        {
+            Debug.Log($"[SpikeTile] {gameObject.name} collision size changed to: {size}");
+        }
+    }
+    
     // Gizmos for visual debugging
     private void OnDrawGizmosSelected()
     {
@@ -306,6 +398,10 @@ public class SpikeTile : MonoBehaviour
         {
             Gizmos.color = isActive ? Color.red : Color.gray;
             Gizmos.DrawWireCube(transform.position, Vector3.one);
+            
+            // Draw collision area
+            Gizmos.color = isActive ? Color.yellow : Color.cyan;
+            Gizmos.DrawWireCube(transform.position, new Vector3(collisionSize.x, collisionSize.y, 0.1f));
         }
     }
 } 

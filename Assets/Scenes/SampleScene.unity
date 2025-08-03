@@ -3000,6 +3000,7 @@ MonoBehaviour:
   activeTime: 3
   inactiveTime: 2
   startActive: 1
+  collisionSize: {x: 0.6, y: 0.6}
   activeColor: {r: 1, g: 0, b: 0, a: 1}
   inactiveColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
   spikeEffect: {fileID: 0}

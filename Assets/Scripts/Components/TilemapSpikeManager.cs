@@ -12,6 +12,7 @@ public class TilemapSpikeManager : MonoBehaviour
     [SerializeField] private float activeTime = 2f;
     [SerializeField] private float inactiveTime = 1f;
     [SerializeField] private bool startActive = true;
+    [SerializeField] private Vector2 collisionSize = new Vector2(0.6f, 0.6f); // Size of the collision area for each spike
     // Removed randomizeStart - spikes will always start in the configured state
     
     [Header("Visual Effects")]
@@ -46,6 +47,9 @@ public class TilemapSpikeManager : MonoBehaviour
         // Get collider for enabling/disabling
         tilemapCollider = GetComponent<Collider2D>();
         
+        // Apply collision size to the collider
+        ApplyCollisionSize();
+        
         // Find all spike tiles in the tilemap
         FindSpikeTiles();
         
@@ -60,6 +64,72 @@ public class TilemapSpikeManager : MonoBehaviour
         {
             Debug.Log($"[TilemapSpikeManager] {gameObject.name} initialized - Active: {isActive}, ActiveTime: {activeTime}s, InactiveTime: {inactiveTime}s, SpikeTiles: {spikePositions.Count}");
         }
+    }
+    
+    private void ApplyCollisionSize()
+    {
+        if (tilemapCollider == null) return;
+        
+        // Apply size to different collider types
+        if (tilemapCollider is BoxCollider2D boxCollider)
+        {
+            boxCollider.size = collisionSize;
+        }
+        else if (tilemapCollider is CircleCollider2D circleCollider)
+        {
+            circleCollider.radius = Mathf.Min(collisionSize.x, collisionSize.y) * 0.5f;
+        }
+        else if (tilemapCollider is CapsuleCollider2D capsuleCollider)
+        {
+            capsuleCollider.size = collisionSize;
+        }
+        
+        if (debugMode)
+        {
+            Debug.Log($"[TilemapSpikeManager] {gameObject.name} collision size set to: {collisionSize}");
+        }
+    }
+    
+    /// <summary>
+    /// Check if the player is protected by falling ground from this spike
+    /// </summary>
+    /// <param name="player">The player controller</param>
+    /// <returns>True if the player is protected by falling ground</returns>
+    private bool IsPlayerProtectedByFallingGround(PlayerController player)
+    {
+        // For tilemap spikes, we need to check from the player's position downward
+        Vector2 rayStart = player.transform.position;
+        Vector2 rayDirection = Vector2.down;
+        float rayDistance = 3f; // Check down to 3 units below the player
+        
+        RaycastHit2D[] hits = Physics2D.RaycastAll(rayStart, rayDirection, rayDistance);
+        
+        if (debugMode)
+        {
+            Debug.DrawRay(rayStart, rayDirection * rayDistance, Color.yellow, 1f);
+        }
+        
+        foreach (RaycastHit2D hit in hits)
+        {
+            // Check if we hit falling ground
+            if (hit.collider.CompareTag("FallingGround") || hit.collider.gameObject.layer == 8) // Layer 8 is Ground
+            {
+                // Check if there's a spike tile below this falling ground
+                Vector3Int tilePosition = tilemap.WorldToCell(hit.collider.transform.position);
+                TileBase tile = tilemap.GetTile(tilePosition);
+                
+                if (tile == spikeTile)
+                {
+                    if (debugMode)
+                    {
+                        Debug.Log($"[TilemapSpikeManager] {gameObject.name} found falling ground protection: {hit.collider.name}");
+                    }
+                    return true;
+                }
+            }
+        }
+        
+        return false;
     }
     
     private void FindSpikeTiles()
@@ -166,6 +236,16 @@ public class TilemapSpikeManager : MonoBehaviour
         PlayerController player = other.GetComponent<PlayerController>();
         if (player != null)
         {
+            // Check if there's falling ground protecting the player from the spike
+            if (IsPlayerProtectedByFallingGround(player))
+            {
+                if (debugMode)
+                {
+                    Debug.Log($"[TilemapSpikeManager] {gameObject.name} player is protected by falling ground, no damage dealt");
+                }
+                return; // Don't damage the player
+            }
+            
             if (debugMode)
             {
                 Debug.Log($"[TilemapSpikeManager] {gameObject.name} hit player, dealing {damage} damage");
@@ -357,6 +437,21 @@ public class TilemapSpikeManager : MonoBehaviour
         }
     }
     
+    /// <summary>
+    /// Set the collision size for the tilemap spikes
+    /// </summary>
+    /// <param name="size">New collision size</param>
+    public void SetCollisionSize(Vector2 size)
+    {
+        collisionSize = size;
+        ApplyCollisionSize();
+        
+        if (debugMode)
+        {
+            Debug.Log($"[TilemapSpikeManager] {gameObject.name} collision size changed to: {size}");
+        }
+    }
+    
     // Gizmos for visual debugging
     private void OnDrawGizmosSelected()
     {
@@ -368,6 +463,10 @@ public class TilemapSpikeManager : MonoBehaviour
             {
                 Vector3 worldPosition = tilemap.GetCellCenterWorld(position);
                 Gizmos.DrawWireCube(worldPosition, Vector3.one * 0.8f);
+                
+                // Draw collision area
+                Gizmos.color = isActive ? Color.yellow : Color.cyan;
+                Gizmos.DrawWireCube(worldPosition, new Vector3(collisionSize.x, collisionSize.y, 0.1f));
             }
         }
     }
