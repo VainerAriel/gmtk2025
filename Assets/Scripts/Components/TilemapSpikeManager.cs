@@ -12,7 +12,7 @@ public class TilemapSpikeManager : MonoBehaviour
     [SerializeField] private float activeTime = 2f;
     [SerializeField] private float inactiveTime = 1f;
     [SerializeField] private bool startActive = true;
-    [SerializeField] private bool randomizeStart = false;
+    // Removed randomizeStart - spikes will always start in the configured state
     
     [Header("Visual Effects")]
     [SerializeField] private Color activeColor = Color.red;
@@ -27,6 +27,7 @@ public class TilemapSpikeManager : MonoBehaviour
     private bool isActive = false;
     private Coroutine spikeCycle;
     private List<Vector3Int> spikePositions = new List<Vector3Int>();
+    private Collider2D tilemapCollider; // Add collider reference
     
     private void Start()
     {
@@ -42,15 +43,13 @@ public class TilemapSpikeManager : MonoBehaviour
             tilemap = GetComponent<Tilemap>();
         }
         
+        // Get collider for enabling/disabling
+        tilemapCollider = GetComponent<Collider2D>();
+        
         // Find all spike tiles in the tilemap
         FindSpikeTiles();
         
-        // Initialize spike state
-        if (randomizeStart)
-        {
-            startActive = Random.value > 0.5f;
-        }
-        
+        // Initialize spike state - no randomization, just use startActive
         isActive = startActive;
         UpdateSpikeVisuals();
         
@@ -146,6 +145,12 @@ public class TilemapSpikeManager : MonoBehaviour
             
             tilemap.SetTileFlags(position, TileFlags.None); // Remove all flags to allow color changes
             tilemap.SetColor(position, tileColor);
+        }
+        
+        // Update collider - disable when inactive, enable when active
+        if (tilemapCollider != null)
+        {
+            tilemapCollider.enabled = isActive; // Disable collider when inactive
         }
     }
     

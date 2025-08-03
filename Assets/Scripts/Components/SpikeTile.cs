@@ -127,18 +127,16 @@ public class SpikeTile : MonoBehaviour
             spriteRenderer.color = currentColor;
         }
         
-        // Update collider - keep it enabled but use isTrigger to control damage
+        // Update collider - disable when inactive, enable when active
         if (spikeCollider != null)
         {
-            // Keep collider enabled but control damage through isActive flag
-            // This allows us to detect overlaps even when inactive
-            spikeCollider.enabled = true;
+            spikeCollider.enabled = isActive; // Disable collider when inactive
         }
     }
     
     private void OnTriggerEnter2D(Collider2D other)
     {
-        if (!isActive) return; // Only damage when active
+        if (!isActive) return; // Only process collisions when active
         
         if (debugMode)
         {
@@ -167,9 +165,9 @@ public class SpikeTile : MonoBehaviour
             }
         }
         
-        // Check for ghost collision
+        // Check for ghost collision - ONLY when active
         GhostController ghost = other.GetComponent<GhostController>();
-        if (ghost != null)
+        if (ghost != null && isActive)
         {
             if (debugMode)
             {
@@ -276,13 +274,13 @@ public class SpikeTile : MonoBehaviour
     /// </summary>
     public void RestartCycle()
     {
-        StopCycle();
+        if (spikeCycle != null)
+        {
+            StopCoroutine(spikeCycle);
+        }
         
-        // Reset to initial state
         isActive = startActive;
         UpdateSpikeVisuals();
-        
-        // Restart the cycle
         spikeCycle = StartCoroutine(SpikeCycle());
         
         if (debugMode)
@@ -291,10 +289,23 @@ public class SpikeTile : MonoBehaviour
         }
     }
     
+    /// <summary>
+    /// Check if the spike is currently active and dangerous
+    /// </summary>
+    /// <returns>True if the spike is active and can damage the player</returns>
+    public bool IsActive()
+    {
+        return isActive;
+    }
+    
     // Gizmos for visual debugging
     private void OnDrawGizmosSelected()
     {
-        Gizmos.color = isActive ? Color.red : Color.gray;
-        Gizmos.DrawWireCube(transform.position, Vector3.one);
+        // Draw spike state in scene view
+        if (debugMode)
+        {
+            Gizmos.color = isActive ? Color.red : Color.gray;
+            Gizmos.DrawWireCube(transform.position, Vector3.one);
+        }
     }
 } 

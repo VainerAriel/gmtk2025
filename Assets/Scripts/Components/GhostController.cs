@@ -448,16 +448,24 @@ public class GhostController : MonoBehaviour
             lastBulletDirection = projectile.GetDirection(); // Store the bullet direction
             TransformIntoReflector(projectile.transform.position, projectile.GetDirection());
         }
-        // Check if hit by spike
-        else if ((other.GetComponent<SpikeTile>() != null || other.GetComponent<TilemapSpikeManager>() != null) && !hasBeenHitBySpike)
+        // Check if hit by ACTIVE spike
+        else if (!hasBeenHitBySpike)
         {
-            Debug.Log($"[GhostController] Hit by spike! Transforming into falling ground...");
-            hasBeenHitBySpike = true;
-            TransformIntoFallingGround();
-        }
-        else if (projectile == null && other.GetComponent<SpikeTile>() == null && other.GetComponent<TilemapSpikeManager>() == null)
-        {
-            Debug.Log($"[GhostController] Hit by something without Projectile or SpikeTile/TilemapSpikeManager component: {other.name}");
+            // Check for SpikeTile
+            SpikeTile spikeTile = other.GetComponent<SpikeTile>();
+            if (spikeTile != null && spikeTile.IsActive())
+            {
+                Debug.Log($"[GhostController] Hit by ACTIVE spike! Transforming into falling ground...");
+                hasBeenHitBySpike = true;
+                TransformIntoFallingGround();
+            }
+            // Check for TilemapSpikeManager
+            else if (other.GetComponent<TilemapSpikeManager>() != null)
+            {
+                Debug.Log($"[GhostController] Hit by TilemapSpikeManager! Transforming into falling ground...");
+                hasBeenHitBySpike = true;
+                TransformIntoFallingGround();
+            }
         }
         else if (hasBeenHitByElectricity)
         {
@@ -488,12 +496,22 @@ public class GhostController : MonoBehaviour
     
     private void OnTriggerStay2D(Collider2D other)
     {
-        // Also check for spikes while staying in trigger
-        if ((other.GetComponent<SpikeTile>() != null || other.GetComponent<TilemapSpikeManager>() != null) && !hasBeenHitBySpike)
+        // Also check for ACTIVE spikes while staying in trigger
+        if (!hasBeenHitBySpike)
         {
-            Debug.Log($"[GhostController] Staying in spike trigger! Transforming into falling ground...");
-            hasBeenHitBySpike = true;
-            TransformIntoFallingGround();
+            SpikeTile spikeTile = other.GetComponent<SpikeTile>();
+            if (spikeTile != null && spikeTile.IsActive())
+            {
+                Debug.Log($"[GhostController] Staying in ACTIVE spike trigger! Transforming into falling ground...");
+                hasBeenHitBySpike = true;
+                TransformIntoFallingGround();
+            }
+            else if (other.GetComponent<TilemapSpikeManager>() != null)
+            {
+                Debug.Log($"[GhostController] Staying in TilemapSpikeManager trigger! Transforming into falling ground...");
+                hasBeenHitBySpike = true;
+                TransformIntoFallingGround();
+            }
         }
     }
     
@@ -510,12 +528,22 @@ public class GhostController : MonoBehaviour
             lastBulletDirection = projectile.GetDirection(); // Store the bullet direction
             TransformIntoReflector(projectile.transform.position, projectile.GetDirection());
         }
-        // Check if hit by spike
-        else if ((collision.gameObject.GetComponent<SpikeTile>() != null || collision.gameObject.GetComponent<TilemapSpikeManager>() != null) && !hasBeenHitBySpike)
+        // Check if hit by ACTIVE spike
+        else if (!hasBeenHitBySpike)
         {
-            Debug.Log($"[GhostController] Hit by spike via collision! Transforming into falling ground...");
-            hasBeenHitBySpike = true;
-            TransformIntoFallingGround();
+            SpikeTile spikeTile = collision.gameObject.GetComponent<SpikeTile>();
+            if (spikeTile != null && spikeTile.IsActive())
+            {
+                Debug.Log($"[GhostController] Hit by ACTIVE spike via collision! Transforming into falling ground...");
+                hasBeenHitBySpike = true;
+                TransformIntoFallingGround();
+            }
+            else if (collision.gameObject.GetComponent<TilemapSpikeManager>() != null)
+            {
+                Debug.Log($"[GhostController] Hit by TilemapSpikeManager via collision! Transforming into falling ground...");
+                hasBeenHitBySpike = true;
+                TransformIntoFallingGround();
+            }
         }
     }
     
