@@ -184,6 +184,16 @@ public class AcidPool : MonoBehaviour
                     break;
                 }
                 
+                // Additional safety check: if player health is 0, stop damage
+                if (currentHealth <= 0)
+                {
+                    if (debugMode)
+                    {
+                        Debug.Log($"[AcidPool] Player health is 0, stopping acid damage at tick {i + 1}");
+                    }
+                    break;
+                }
+                
                 // Apply damage
                 player.TakeDamage(damagePerTick);
                 

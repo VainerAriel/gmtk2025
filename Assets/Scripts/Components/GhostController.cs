@@ -28,6 +28,7 @@ public class GhostController : MonoBehaviour
     [Header("Transformation")]
     [SerializeField] private bool hasBeenHitByElectricity = false;
     [SerializeField] private bool hasBeenHitBySpike = false;
+    [SerializeField] private bool hasBeenHitByAcid = false;
     [SerializeField] private GameObject fallingGroundPrefab;
     private Vector2 lastBulletDirection = Vector2.right;
     
@@ -35,7 +36,7 @@ public class GhostController : MonoBehaviour
     private bool usePositionBasedReplay = true; // Use position-based replay for perfect accuracy
     private float replaySpeed = 1f; // Can be adjusted for slow-motion effects
     
-    public void Initialize(PlayerController.PlayerAction[] actions, bool allowPhysicsAfterFreeze, float moveSpeed, float jumpForce, PhysicsMaterial2D playerMaterial)
+    public void Initialize(PlayerController.PlayerAction[] actions, bool allowPhysicsAfterFreeze, float moveSpeed, float jumpForce, PhysicsMaterial2D playerMaterial, bool diedFromAcid = false)
     {
         recordedActions = actions;
         this.allowPhysicsAfterFreeze = allowPhysicsAfterFreeze;
@@ -54,6 +55,9 @@ public class GhostController : MonoBehaviour
         hasJumped = false;
         hasBeenHitByElectricity = false;
         hasBeenHitBySpike = false;
+        hasBeenHitByAcid = diedFromAcid;
+        
+        Debug.Log($"[GhostController] Ghost {gameObject.name} initialized with diedFromAcid={diedFromAcid}, hasBeenHitByAcid={hasBeenHitByAcid}");
         
         // Set up components
         SetupComponents(playerMaterial);
@@ -63,6 +67,17 @@ public class GhostController : MonoBehaviour
         {
             transform.position = recordedActions[0].position;
             Debug.Log($"[GhostController] Set initial position to: {transform.position}");
+        }
+        
+        // If ghost died from acid, trigger the acid transformation immediately
+        if (diedFromAcid)
+        {
+            Debug.Log($"[GhostController] Ghost died from acid, triggering acid explosion transformation");
+            TransformIntoAcidExplosion();
+        }
+        else
+        {
+            Debug.Log($"[GhostController] Ghost did not die from acid (diedFromAcid={diedFromAcid})");
         }
     }
     
@@ -437,7 +452,7 @@ public class GhostController : MonoBehaviour
     
     private void OnTriggerEnter2D(Collider2D other)
     {
-        Debug.Log($"[GhostController] Trigger entered with: {other.name}, layer: {other.gameObject.layer}");
+        Debug.Log($"[GhostController] Trigger entered with: {other.name}, layer: {other.gameObject.layer}, hasBeenHitByAcid={hasBeenHitByAcid}");
         
         // Check if hit by electricity projectile
         Projectile projectile = other.GetComponent<Projectile>();
@@ -883,5 +898,104 @@ public class GhostController : MonoBehaviour
     private Vector2 GetLastBulletDirection()
     {
         return lastBulletDirection;
+    }
+    
+    /// <summary>
+    /// Reset the acid hit state so the ghost can transform again
+    /// </summary>
+    public void ResetAcidHitState()
+    {
+        hasBeenHitByAcid = false;
+        Debug.Log($"[GhostController] Acid hit state reset for {gameObject.name}");
+    }
+    
+    /// <summary>
+    /// Manually trigger acid transformation (for testing)
+    /// </summary>
+    public void TestAcidTransformation()
+    {
+        Debug.Log($"[GhostController] Test acid transformation called for {gameObject.name}");
+        if (!hasBeenHitByAcid)
+        {
+            hasBeenHitByAcid = true;
+            TransformIntoAcidExplosion();
+        }
+        else
+        {
+            Debug.Log($"[GhostController] Already hit by acid, resetting and trying again");
+            hasBeenHitByAcid = false;
+            TransformIntoAcidExplosion();
+        }
+    }
+    
+    /// <summary>
+    /// Transform the ghost into an acid explosion that destroys adjacent breakable blocks
+    /// </summary>
+    private void TransformIntoAcidExplosion()
+    {
+        Debug.Log($"[GhostController] TransformIntoAcidExplosion called for {gameObject.name} at position {transform.position}");
+        
+        // Get the ghost's current position and snap to grid
+        Vector3 ghostPosition = transform.position;
+        Vector3 snappedPosition = new Vector3(
+            Mathf.Round(ghostPosition.x + 0.5f) - 0.5f,
+            Mathf.Round(ghostPosition.y) - 0.5f,
+            ghostPosition.z
+        );
+        
+        Debug.Log($"[GhostController] Ghost position snapped from {ghostPosition} to {snappedPosition}");
+        
+        // Define the 6 adjacent positions: 2 left, 2 right, 1 up, 1 down
+        Vector3[] adjacentPositions = new Vector3[]
+        {
+            snappedPosition + Vector3.left + Vector3.up,  // 2 left
+            snappedPosition + Vector3.left,       // 1 left
+            snappedPosition + Vector3.right,      // 1 right
+            snappedPosition + Vector3.right + Vector3.up,  // 2 right
+            snappedPosition + Vector3.up * 2,         // 1 up
+            snappedPosition + Vector3.down        // 1 down
+        };
+        
+        Debug.Log($"[GhostController] Checking {adjacentPositions.Length} adjacent positions for breakable tiles");
+        
+        int tilesFound = 0;
+        int tilesDestroyed = 0;
+        
+        // Use the manager to handle tilemap operations
+        if (BreakableTilemapManager.Instance != null)
+        {
+            Debug.Log($"[GhostController] Using BreakableTilemapManager with {BreakableTilemapManager.Instance.GetTilemapCount()} registered tilemaps");
+            
+            // Check each adjacent position for breakable tiles
+            foreach (Vector3 position in adjacentPositions)
+            {
+                Debug.Log($"[GhostController] Checking position: {position}");
+                
+                // Check if there's a tile at this position
+                if (BreakableTilemapManager.Instance.HasTileAtPosition(position))
+                {
+                    tilesFound++;
+                    Debug.Log($"[GhostController] Found breakable tile at {position}");
+                    
+                    // Destroy the tile
+                    if (BreakableTilemapManager.Instance.DestroyTileAtPosition(position))
+                    {
+                        tilesDestroyed++;
+                        Debug.Log($"[GhostController] Destroyed tile at {position}");
+                    }
+                }
+            }
+        }
+        else
+        {
+            Debug.LogWarning("[GhostController] No BreakableTilemapManager found in scene!");
+        }
+        
+        Debug.Log($"[GhostController] Acid explosion complete: Found {tilesFound} breakable tiles, destroyed {tilesDestroyed}");
+        
+        // Destroy the ghost
+        Destroy(gameObject);
+        
+        Debug.Log($"[GhostController] Ghost transformed into acid explosion, destroyed adjacent breakable tiles");
     }
 } 

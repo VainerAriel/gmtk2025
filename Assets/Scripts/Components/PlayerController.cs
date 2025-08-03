@@ -30,6 +30,7 @@ public class PlayerController : MonoBehaviour
     [Header("Death Types")]
     [SerializeField] private bool instantDeathFromElectricity = true;
     [SerializeField] private bool instantDeathFromSpike = true;
+    [SerializeField] private bool instantDeathFromAcid = true;
     
     private Rigidbody2D rb;
     private bool isGrounded;
@@ -45,6 +46,7 @@ public class PlayerController : MonoBehaviour
     private bool isRecording = true;
     
     private bool isPoisoned = false;
+    private bool diedFromAcid = false;
     
     [System.Serializable]
     public class PlayerAction
@@ -245,13 +247,14 @@ public class PlayerController : MonoBehaviour
             }
         }
         
-        // Reset all ghosts' electricity and spike hit states
+        // Reset all ghosts' electricity, spike, and acid hit states
         foreach (GhostController ghost in activeGhosts)
         {
             if (ghost != null)
             {
                 ghost.ResetElectricityHitState();
                 ghost.ResetSpikeHitState();
+                ghost.ResetAcidHitState();
             }
         }
         
@@ -318,7 +321,7 @@ public class PlayerController : MonoBehaviour
         
         // Add ghost controller with the stored memory
         GhostController ghostController = ghostObject.AddComponent<GhostController>();
-        ghostController.Initialize(memory, allowGhostPhysicsAfterFreeze, moveSpeed, jumpForce, rb.sharedMaterial);
+        ghostController.Initialize(memory, allowGhostPhysicsAfterFreeze, moveSpeed, jumpForce, rb.sharedMaterial, false); // Recreated ghosts don't have acid death
         activeGhosts.Add(ghostController);
         
         Debug.Log($"[PlayerController] Recreated ghost {memoryIndex} with {memory.Length} recorded actions");
@@ -384,8 +387,13 @@ public class PlayerController : MonoBehaviour
         
         // Add ghost controller
         GhostController ghostController = ghostObject.AddComponent<GhostController>();
-        ghostController.Initialize(ghostMemory, allowGhostPhysicsAfterFreeze, moveSpeed, jumpForce, rb.sharedMaterial);
+        ghostController.Initialize(ghostMemory, allowGhostPhysicsAfterFreeze, moveSpeed, jumpForce, rb.sharedMaterial, diedFromAcid);
         activeGhosts.Add(ghostController);
+        
+        Debug.Log($"[PlayerController] Created ghost with diedFromAcid={diedFromAcid}");
+        
+        // Reset acid death state after passing it to the ghost
+        ResetAcidDeathState();
     }
     
     private void CheckGrounded()
@@ -411,6 +419,13 @@ public class PlayerController : MonoBehaviour
     
     public void TakeDamage(float damage)
     {
+        // Prevent damage if player is already dead/respawning
+        if (currentHealth <= 0)
+        {
+            Debug.LogWarning("[PlayerController] TakeDamage called while player is already dead, ignoring damage");
+            return;
+        }
+        
         currentHealth -= damage;
         
         // Check for instant death from electricity (very high damage)
@@ -433,6 +448,11 @@ public class PlayerController : MonoBehaviour
         
         if (currentHealth <= 0)
         {
+            // Check if player died from acid (was poisoned)
+            diedFromAcid = isPoisoned;
+            
+            Debug.Log($"[PlayerController] Player died! isPoisoned={isPoisoned}, diedFromAcid={diedFromAcid}");
+            
             // Clear poison when player dies
             SetPoisoned(false);
             
@@ -486,5 +506,15 @@ public class PlayerController : MonoBehaviour
         isPoisoned = poisoned;
         
         Debug.Log($"[PlayerController] Poison status: {poisoned}");
+    }
+    
+    public bool DiedFromAcid()
+    {
+        return diedFromAcid;
+    }
+    
+    public void ResetAcidDeathState()
+    {
+        diedFromAcid = false;
     }
 } 
