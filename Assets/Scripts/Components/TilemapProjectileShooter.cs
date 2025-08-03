@@ -25,14 +25,18 @@ public class TilemapProjectileShooter : MonoBehaviour
     
     private void Start()
     {
-        audioSource = GetComponent<AudioSource>();
-        if (audioSource == null)
+        // Only add AudioSource if shootSound is assigned
+        if (shootSound != null)
         {
-            audioSource = gameObject.AddComponent<AudioSource>();
+            audioSource = GetComponent<AudioSource>();
+            if (audioSource == null)
+            {
+                audioSource = gameObject.AddComponent<AudioSource>();
+            }
         }
         
-        // Ensure the shooter has collision components
-        SetupCollision();
+        // Only setup collision if needed (you can disable this entirely)
+        // SetupCollision();
         
         // If no tilemap assigned, try to get it from this GameObject
         if (tilemap == null)
