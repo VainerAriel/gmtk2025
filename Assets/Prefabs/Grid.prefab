@@ -2319,7 +2319,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   tilemap: {fileID: 8194675057074015578}
-  projectilePrefab: {fileID: 6598232878931956727, guid: fbf11f5260e478e419d36e17434874b6, type: 3}
+  projectilePrefab: {fileID: 3551917547765633024, guid: b09390d6232446240aa9143b8b312bdf, type: 3}
   shootInterval: 2
   projectileSpeed: 8
   shootOnStart: 1
@@ -2503,7 +2503,7 @@ TilemapRenderer:
   m_AutoUVMaxAngle: 89
   m_LightmapParameters: {fileID: 0}
   m_SortingLayerID: 1426605441
-  m_SortingLayer: 3
+  m_SortingLayer: 0
   m_SortingOrder: 0
   m_ChunkSize: {x: 32, y: 32, z: 32}
   m_ChunkCullingBounds: {x: 0, y: 0, z: 0}
@@ -3872,7 +3872,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   tilemap: {fileID: 8194675057974256008}
-  projectilePrefab: {fileID: 6598232878931956727, guid: fbf11f5260e478e419d36e17434874b6, type: 3}
+  projectilePrefab: {fileID: 3551917547765633024, guid: b09390d6232446240aa9143b8b312bdf, type: 3}
   shootInterval: 2
   projectileSpeed: 8
   shootOnStart: 1
@@ -4104,7 +4104,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   tilemap: {fileID: 8194675058457287073}
-  projectilePrefab: {fileID: 6598232878931956727, guid: fbf11f5260e478e419d36e17434874b6, type: 3}
+  projectilePrefab: {fileID: 3551917547765633024, guid: b09390d6232446240aa9143b8b312bdf, type: 3}
   shootInterval: 2
   projectileSpeed: 8
   shootOnStart: 1
@@ -4319,7 +4319,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   tilemap: {fileID: 8194675058469590873}
-  projectilePrefab: {fileID: 6598232878931956727, guid: fbf11f5260e478e419d36e17434874b6, type: 3}
+  projectilePrefab: {fileID: 3551917547765633024, guid: b09390d6232446240aa9143b8b312bdf, type: 3}
   shootInterval: 2
   projectileSpeed: 8
   shootOnStart: 1
@@ -4534,7 +4534,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   tilemap: {fileID: 8194675058814965487}
-  projectilePrefab: {fileID: 6971938741500716687, guid: 37f60cd6a831d90489ae59d0e2dde3cd, type: 3}
+  projectilePrefab: {fileID: 7984057806991783772, guid: 48214674c2d77e843a1958fdff95eed2, type: 3}
   shootInterval: 4
   projectileSpeed: 2
   shootOnStart: 1

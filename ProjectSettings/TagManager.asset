@@ -15,14 +15,14 @@ TagManager:
   - Ghost
   - Ground
   - Moveable Blocks
+  - projectileLayer
+  - reflectLayer
+  - projectileShooterLayer
+  - spikeLayer
+  - acidPool
+  - 
+  - 
   - BG
-  - Spike
-  - 
-  - 
-  - Acid poll
-  - 
-  - 
-  - 
   - 
   - 
   - 
@@ -43,6 +43,12 @@ TagManager:
     locked: 0
   - name: BG
     uniqueID: 406282791
+    locked: 0
+  - name: Projectile
+    uniqueID: 532104803
+    locked: 0
+  - name: Acid Pool
+    uniqueID: 285904887
     locked: 0
   - name: Ground
     uniqueID: 349612151
