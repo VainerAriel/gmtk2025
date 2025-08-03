@@ -12,6 +12,7 @@ public class AcidPool : MonoBehaviour
     [Header("Visual Effects")]
     [SerializeField] private Color acidColor = Color.green;
     [SerializeField] private float pulseSpeed = 1f;
+    [SerializeField] private AcidPoolParticles particleController; // Add this line
     
     [Header("Debug")]
     [SerializeField] private bool debugMode = false;
@@ -80,6 +81,12 @@ public class AcidPool : MonoBehaviour
     
     private IEnumerator FadeOut()
     {
+        // Stop particles when fading out
+        if (particleController != null)
+        {
+            particleController.StopParticles();
+        }
+        
         if (spriteRenderer != null)
         {
             float fadeTime = 1f;
@@ -153,6 +160,16 @@ public class AcidPool : MonoBehaviour
         {
             if (player != null)
             {
+                // Check if player is no longer poisoned (indicating respawn)
+                if (!player.IsPoisoned())
+                {
+                    if (debugMode)
+                    {
+                        Debug.Log($"[AcidPool] Player respawned, stopping acid damage");
+                    }
+                    break; // Player respawned, stop the damage
+                }
+                
                 // Check if player died since last tick
                 float currentHealth = player.GetHealth();
                 if (currentHealth <= 0 && previousHealth > 0)

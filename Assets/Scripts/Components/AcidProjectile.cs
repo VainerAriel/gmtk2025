@@ -173,9 +173,11 @@ public class AcidProjectile : MonoBehaviour
         // Convert world position to tilemap position
         Vector3Int tilePos = tilemap.WorldToCell(hitPoint);
         
-        // Get the center of the tile above the hit point
-        Vector3Int tileAbovePos = new Vector3Int(tilePos.x, tilePos.y + 1, tilePos.z);
-        Vector3 poolSpawnPosition = tilemap.GetCellCenterWorld(tileAbovePos);
+        // Get the center of the tile at the hit point (instead of above)
+        Vector3 poolSpawnPosition = tilemap.GetCellCenterWorld(tilePos);
+        
+        // Move the spawn position down by half a tile
+        poolSpawnPosition.y -= tilemap.cellSize.y * 0.5f;
         
         // Check if there's already an acid pool at this location
         Collider2D[] existingPools = Physics2D.OverlapCircleAll(poolSpawnPosition, 0.1f);
@@ -227,6 +229,16 @@ public class AcidProjectile : MonoBehaviour
         {
             if (player != null)
             {
+                // Check if player is no longer poisoned (indicating respawn)
+                if (!player.IsPoisoned())
+                {
+                    if (debugMode)
+                    {
+                        Debug.Log($"[AcidProjectile] Player respawned, stopping acid damage");
+                    }
+                    break; // Player respawned, stop the damage
+                }
+                
                 // Check if player died since last tick
                 float currentHealth = player.GetHealth();
                 if (currentHealth <= 0 && previousHealth > 0)
@@ -251,11 +263,20 @@ public class AcidProjectile : MonoBehaviour
                 
                 previousHealth = currentHealth;
             }
+            else
+            {
+                // Player reference lost, stop acid damage
+                if (debugMode)
+                {
+                    Debug.Log($"[AcidProjectile] Player reference lost, stopping acid damage");
+                }
+                break;
+            }
             
             yield return new WaitForSeconds(tickInterval);
         }
         
-        // Clear poison status when damage is complete
+        // Clear poison status when damage is complete (only if we set it)
         if (player != null && player.GetHealth() > 0 && player.IsPoisoned())
         {
             player.SetPoisoned(false);
