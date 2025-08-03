@@ -135,10 +135,18 @@ public class TilemapProjectileShooter : MonoBehaviour
     
     private void ShootProjectile(Vector3 spawnPosition)
     {
-        // Create projectile
         GameObject projectileObj = Instantiate(projectilePrefab, spawnPosition, Quaternion.identity);
+
+        // Try AcidProjectile first
+        AcidProjectile acidProjectile = projectileObj.GetComponent<AcidProjectile>();
+        if (acidProjectile != null)
+        {
+            acidProjectile.Initialize(shootDirection, projectileSpeed);
+            return;
+        }
+
+        // Fallback to regular Projectile
         Projectile projectile = projectileObj.GetComponent<Projectile>();
-        
         if (projectile != null)
         {
             projectile.Initialize(shootDirection, projectileSpeed, gameObject);
@@ -149,16 +157,8 @@ public class TilemapProjectileShooter : MonoBehaviour
         {
             Instantiate(shootEffect, spawnPosition, Quaternion.identity);
         }
-        
-        if (shootSound != null && audioSource != null)
-        {
-            audioSource.PlayOneShot(shootSound);
-        }
-        
-        if (debugMode)
-        {
-            Debug.Log($"[TilemapProjectileShooter] {gameObject.name} shot projectile from {spawnPosition} in direction {shootDirection}");
-        }
+
+        Debug.LogError("Projectile prefab has neither AcidProjectile nor Projectile component!");
     }
     
     // Public methods for external control
