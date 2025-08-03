@@ -181,6 +181,55 @@ public class PlayerController : MonoBehaviour
                 }
             }
         }
+
+        // Pushable blocks logic
+        // if (horizontalInput != 0 && blockPushTimer <= 0f)
+        // {
+        //     Vector2 direction = new Vector2(Mathf.Sign(horizontalInput), 0);
+
+        //     // Adjust boxOrigin based on direction to ensure consistent detection
+        //     Vector2 boxOrigin = (Vector2)transform.position;
+        //     if (direction.x > 0) // Pushing right
+        //     {
+        //         boxOrigin += Vector2.right * 0.1f; // Slight offset for rightward detection
+        //     }
+        //     else // Pushing left
+        //     {
+        //         boxOrigin += Vector2.left * 0.1f; // Slight offset for leftward detection
+        //     }
+
+        //     Vector2 boxSize = new Vector2(0.3f, 0.9f);
+
+        //     RaycastHit2D hit = Physics2D.BoxCast(
+        //         boxOrigin,
+        //         boxSize,
+        //         0f,
+        //         direction,
+        //         pushDistance,
+        //         pushableLayer
+        //     );
+
+        //     // Add debug visualization
+        //     Debug.DrawRay(boxOrigin, direction * pushDistance, direction.x > 0 ? Color.blue : Color.red);
+
+        //     if (hit.collider != null)
+        //     {
+        //         PushableBlock block = hit.collider.GetComponent<PushableBlock>();
+        //         if (block != null)
+        //         {
+        //             Debug.Log($"Pushing {direction} - Block position: {block.transform.position}");
+        //             if (block.TryMove(direction))
+        //             {
+        //                 blockPushTimer = blockPushCooldown;
+        //                 Debug.Log("Push successful");
+        //             }
+        //             else
+        //             {
+        //                 Debug.Log("Push failed - check block state");
+        //             }
+        //         }
+        //     }
+        // }
         
     }
 

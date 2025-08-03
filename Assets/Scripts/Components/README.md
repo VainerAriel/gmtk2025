@@ -36,17 +36,20 @@ A trigger-based component that detects when the player or ghost stands on it and
 - `Plate Move Distance`: How far the plate moves down (in grid units)
 - `Plate Move Speed`: Speed of plate movement
 
-**Ghost Integration:**
-- Pressure plates can be activated by both players and ghosts
-- The plate stays activated as long as any entity (player or ghost) is standing on it
+**Entity Integration:**
+- Pressure plates can be activated by players, ghosts, and pushable blocks
+- The plate stays activated as long as any entity (player, ghost, or pushable block) is standing on it
 - Multiple entities can be on the plate simultaneously
 - The plate deactivates only when all entities have left
+- Pushable blocks can glide over the pressure plate just like players and ghosts
 
 **Plate Movement:**
 - When activated, the pressure plate moves down into the ground
 - When deactivated, the pressure plate moves back up to its original position
-- Movement is smooth and configurable
+- Movement is smooth and configurable (default speed: 8 units/second for smooth gliding)
 - Plate resets to original position on player respawn
+- Side approach detection allows entities to glide smoothly over the plate
+- Small delay before moving plate back up prevents flickering during transitions
 
 ### DoorController.cs
 Handles the visibility and collision of doors when activated by pressure plates. When activated, the door becomes invisible and passable (no movement).
@@ -82,8 +85,9 @@ The pressure plate system is integrated with the player respawn system. When the
 1. Create a pressure plate GameObject with a trigger collider
 2. Create a door GameObject with a SpriteRenderer and Collider2D
 3. Assign the door to the pressure plate's "Door Object" field
-4. The door will become invisible and passable when the player stands on the plate
-5. The door will become visible and solid again when the player steps off the plate
+4. The door will become invisible and passable when any entity (player, ghost, or pushable block) stands on the plate
+5. The door will become visible and solid again when all entities step off the plate
+6. Pushable blocks can be pushed onto the pressure plate to activate it
 
 ### Tips:
 - Use the visual feedback colors to easily see the plate's state

@@ -45,7 +45,7 @@ public class PushableBlock : MonoBehaviour
         Collider2D hit = Physics2D.OverlapBox(boxCenter, boxSize, 0f, obstacleLayer);
 
         Debug.DrawLine(boxCenter + Vector2.left * 0.4f, boxCenter + Vector2.right * 0.4f, Color.red, 0.1f);
-        Debug.Log($"IsGrounded: {hit != null} at position {transform.position}");
+        // Debug.Log($"IsGrounded: {hit != null} at position {transform.position}");
 
         return hit != null;
     }

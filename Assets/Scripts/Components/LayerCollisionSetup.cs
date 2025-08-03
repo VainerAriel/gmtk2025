@@ -21,6 +21,7 @@ public class LayerCollisionSetup : MonoBehaviour
         int defaultLayer = LayerMask.NameToLayer("Default");
         int groundLayer = LayerMask.NameToLayer("Ground");
         int pressurePlateLayer = LayerMask.NameToLayer("PressurePlate");
+        int moveableBlockLayer = LayerMask.NameToLayer("Moveable Blocks");
         
         // Disable collision between Player and Ghost layers
         if (playerLayer != -1 && ghostLayer != -1)
@@ -70,6 +71,12 @@ public class LayerCollisionSetup : MonoBehaviour
             if (ghostLayer != -1)
             {
                 Physics2D.IgnoreLayerCollision(ghostLayer, pressurePlateLayer, false);
+            }
+            
+            // Moveable blocks can collide with pressure plates
+            if (moveableBlockLayer != -1)
+            {
+                Physics2D.IgnoreLayerCollision(moveableBlockLayer, pressurePlateLayer, false);
             }
             
             // Pressure plates can collide with ground
