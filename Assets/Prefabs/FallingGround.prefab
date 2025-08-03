@@ -148,6 +148,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   gravityScale: 1
   freezeRotation: 1
-  colliderSize: {x: 1, y: 0.95}
+  colliderSize: {x: 1, y: 1.01}
   groundColor: {r: 0.5, g: 0.3, b: 0.2, a: 1}
+  landingVelocityThreshold: 0.1
+  landingCheckDelay: 0.5
+  freezeOnLanding: 1
   debugMode: 1

@@ -8,12 +8,21 @@ public class FallingGround : MonoBehaviour
     [SerializeField] private Vector2 colliderSize = new Vector2(1f, 2f);
     [SerializeField] private Color groundColor = new Color(0.5f, 0.3f, 0.2f, 1f);
     
+    [Header("Landing Settings")]
+    [SerializeField] private float landingVelocityThreshold = 0.1f; // Velocity threshold to consider "landed"
+    [SerializeField] private float landingCheckDelay = 0.5f; // Delay before checking if landed
+    [SerializeField] private bool freezeOnLanding = true; // Whether to freeze the block when it lands
+    
     [Header("Debug")]
     [SerializeField] private bool debugMode = true;
     
     private Rigidbody2D rb;
     private BoxCollider2D groundCollider;
     private SpriteRenderer spriteRenderer;
+    private bool hasLanded = false;
+    private float landingCheckTimer = 0f;
+    private Vector3 lastPosition;
+    private float lastPositionCheckTime = 0f;
     
     private void Start()
     {
@@ -39,9 +48,68 @@ public class FallingGround : MonoBehaviour
         // Configure the falling ground
         SetupFallingGround();
         
+        // Initialize position tracking
+        lastPosition = transform.position;
+        lastPositionCheckTime = Time.time;
+        
         if (debugMode)
         {
             Debug.Log($"[FallingGround] {gameObject.name} initialized at position: {transform.position}");
+        }
+    }
+    
+    private void Update()
+    {
+        if (!hasLanded && freezeOnLanding)
+        {
+            CheckIfLanded();
+        }
+    }
+    
+    private void CheckIfLanded()
+    {
+        // Wait a bit before starting to check for landing
+        if (Time.time < landingCheckDelay)
+            return;
+            
+        // Check if the block has stopped moving
+        if (rb != null && rb.velocity.magnitude < landingVelocityThreshold)
+        {
+            // Check if position hasn't changed significantly
+            if (Time.time - lastPositionCheckTime > 0.1f) // Check every 0.1 seconds
+            {
+                float distanceMoved = Vector3.Distance(transform.position, lastPosition);
+                if (distanceMoved < 0.01f) // Very small movement threshold
+                {
+                    // Block has landed - freeze it
+                    FreezeBlock();
+                }
+                
+                lastPosition = transform.position;
+                lastPositionCheckTime = Time.time;
+            }
+        }
+    }
+    
+    private void FreezeBlock()
+    {
+        if (hasLanded) return; // Already frozen
+        
+        hasLanded = true;
+        
+        if (rb != null)
+        {
+            // Stop all movement
+            rb.velocity = Vector2.zero;
+            rb.angularVelocity = 0f;
+            
+            // Make it static so it can't be pushed
+            rb.bodyType = RigidbodyType2D.Static;
+        }
+        
+        if (debugMode)
+        {
+            Debug.Log($"[FallingGround] {gameObject.name} has landed and been frozen at position: {transform.position}");
         }
     }
     
@@ -225,6 +293,23 @@ public class FallingGround : MonoBehaviour
     {
         if (rb == null) return false;
         return rb.velocity.magnitude > 0.1f;
+    }
+    
+    /// <summary>
+    /// Check if the falling ground has landed and been frozen
+    /// </summary>
+    /// <returns>True if the falling ground has landed</returns>
+    public bool HasLanded()
+    {
+        return hasLanded;
+    }
+    
+    /// <summary>
+    /// Manually freeze the falling ground (useful for testing or special cases)
+    /// </summary>
+    public void ForceFreeze()
+    {
+        FreezeBlock();
     }
     
     /// <summary>
