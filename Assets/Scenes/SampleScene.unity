@@ -4425,10 +4425,10 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1238164041}
+  - component: {fileID: 1238164042}
   - component: {fileID: 1238164045}
   - component: {fileID: 1238164044}
   - component: {fileID: 1238164043}
-  - component: {fileID: 1238164042}
   m_Layer: 0
   m_Name: PressurePlate
   m_TagString: Untagged
@@ -4444,7 +4444,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1238164039}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 6.77, y: -3.81, z: 0}
+  m_LocalPosition: {x: 6.5, y: -3.75, z: 0}
   m_LocalScale: {x: 1, y: 0.5, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -4489,8 +4489,8 @@ SpriteRenderer:
   m_AutoUVMaxDistance: 0.5
   m_AutoUVMaxAngle: 89
   m_LightmapParameters: {fileID: 0}
-  m_SortingLayerID: 0
-  m_SortingLayer: 0
+  m_SortingLayerID: 349612151
+  m_SortingLayer: 4
   m_SortingOrder: 0
   m_Sprite: {fileID: 7482667652216324306, guid: 311925a002f4447b3a28927169b83ea6, type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
@@ -4924,7 +4924,7 @@ GameObject:
   - component: {fileID: 1538384417}
   - component: {fileID: 1538384416}
   - component: {fileID: 1538384415}
-  m_Layer: 0
+  m_Layer: 8
   m_Name: BarrierAnim
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -5032,8 +5032,8 @@ SpriteRenderer:
   m_AutoUVMaxDistance: 0.5
   m_AutoUVMaxAngle: 89
   m_LightmapParameters: {fileID: 0}
-  m_SortingLayerID: 0
-  m_SortingLayer: 0
+  m_SortingLayerID: 349612151
+  m_SortingLayer: 4
   m_SortingOrder: 0
   m_Sprite: {fileID: 21300000, guid: a1730d6c9b327bc4cba9e48c7ab88c91, type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
