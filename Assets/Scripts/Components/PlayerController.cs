@@ -4,6 +4,8 @@ using UnityEngine.Windows;
 using Input = UnityEngine.Input;
 using Unity.Burst.CompilerServices;
 using System;
+using UnityEngine.UI;
+using System.Collections;
 
 public class PlayerController : MonoBehaviour
 {
@@ -24,7 +26,13 @@ public class PlayerController : MonoBehaviour
     [SerializeField] private bool useTileBasedDeath = true;
     [SerializeField] private float tileSize = 1f; // Size of one tile in world units
     [SerializeField] private int tilesBelowPlatform = 10; // Number of tiles below platform to trigger death
-    
+
+    [Header("Death Overlay")]
+    [SerializeField] private Animator deathOverlayAnimator;
+    [SerializeField] private CanvasGroup deathOverlayCanvasGroup;
+    [SerializeField] private AnimationClip deathAnimation;
+    [SerializeField] private float respawnDelay = 0.5f; // Extra delay after the animation
+
     [Header("Ghost System")]
     [SerializeField] private int maxGhosts = 3;
     [SerializeField] private Vector3 startPosition = new Vector3(-3.38f, -2.55f, 0f);
@@ -110,7 +118,7 @@ public class PlayerController : MonoBehaviour
         // Check for respawn input
         if (Input.GetKeyDown(KeyCode.X))
         {
-            RespawnPlayer();
+            DieAndRespawn();
         }
 
         // Movement input
@@ -231,18 +239,57 @@ public class PlayerController : MonoBehaviour
         );
         recordedActions.Add(action);
     }
-    
-    private void RespawnPlayer()
+
+    // This is the new public function you should call when the player dies.
+    // Replace all calls to `RespawnPlayer()` with this.
+    public void DieAndRespawn()
     {
         // Stop recording current session
         isRecording = false;
-        
+
+        // Stop all player movement and disable the main sprite.
+        GetComponent<SpriteRenderer>().enabled = false;
+        rb.velocity = Vector2.zero;
+        rb.isKinematic = true;
+
+        // Play the death animation and show the overlay
+        if (deathOverlayAnimator != null && deathOverlayCanvasGroup != null)
+        {
+            deathOverlayCanvasGroup.alpha = 1; // Make the overlay fully visible
+            deathOverlayAnimator.SetTrigger("PlayDeathAnimation");
+        }
+
+        // Start a coroutine to handle the delay and respawn
+        StartCoroutine(RespawnWithDelay());
+    }
+
+    private IEnumerator RespawnWithDelay()
+    {
+        float animationLength = 0f;
+        if (deathAnimation != null)
+        {
+            animationLength = deathAnimation.length;
+        }
+
+        // Wait for the animation to finish
+        yield return new WaitForSeconds(animationLength);
+
+        // Wait for the additional delay specified
+        yield return new WaitForSeconds(respawnDelay);
+
+        // Perform the actual respawn logic
+        FinalizeRespawn();
+    }
+
+    // This method contains all the original functionality from your RespawnPlayer()
+    private void FinalizeRespawn()
+    {
         // Create ghost from recorded actions
         if (recordedActions.Count > 0)
         {
             CreateGhost();
         }
-        
+
         // Restart all active ghosts
         RestartAllGhosts();
 
@@ -251,16 +298,24 @@ public class PlayerController : MonoBehaviour
 
         // Reset player position and state
         transform.position = startPosition;
+        rb.isKinematic = false; // Restore physics
         rb.velocity = Vector2.zero;
         hasJumped = false;
         isGrounded = false;
-        
+        GetComponent<SpriteRenderer>().enabled = true; // Restore sprite
+
+        // Hide the overlay by setting its alpha to 0
+        if (deathOverlayCanvasGroup != null)
+        {
+            deathOverlayCanvasGroup.alpha = 0;
+        }
+
         // Start new recording session
         recordedActions.Clear();
         gameStartTime = Time.time;
         isRecording = true;
     }
-    
+
     private void RestartAllGhosts()
     {
         foreach (GhostController ghost in activeGhosts)
@@ -370,7 +425,7 @@ public class PlayerController : MonoBehaviour
         if (currentHealth <= 0)
         {
             // Automatic respawn when health reaches zero
-            RespawnPlayer();
+            DieAndRespawn();
             currentHealth = maxHealth;
         }
     }
@@ -404,7 +459,7 @@ public class PlayerController : MonoBehaviour
         if (transform.position.y < deathThreshold)
         {
             // Trigger automatic respawn when falling off the platform
-            RespawnPlayer();
+            DieAndRespawn();
             currentHealth = maxHealth;
         }
     }
