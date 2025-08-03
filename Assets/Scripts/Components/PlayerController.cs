@@ -255,8 +255,10 @@ public class PlayerController : MonoBehaviour
         // Play the death animation and show the overlay
         if (deathOverlayAnimator != null && deathOverlayCanvasGroup != null)
         {
-            deathOverlayCanvasGroup.alpha = 1; // Make the overlay fully visible
-            deathOverlayAnimator.SetTrigger("PlayDeathAnimation");
+            // Set the alpha to 1 to make the overlay visible
+            deathOverlayCanvasGroup.alpha = 1;
+            // Directly play the animation, specifying the layer index (0 for the base layer)
+            deathOverlayAnimator.Play("DeathOverlayAnimation", 0);
         }
 
         // Start a coroutine to handle the delay and respawn
@@ -271,13 +273,13 @@ public class PlayerController : MonoBehaviour
             animationLength = deathAnimation.length;
         }
 
-        // Wait for the animation to finish
+        // Wait for the animation to finish playing
         yield return new WaitForSeconds(animationLength);
 
         // Wait for the additional delay specified
         yield return new WaitForSeconds(respawnDelay);
 
-        // Perform the actual respawn logic
+        // Perform the rest of the respawn logic
         FinalizeRespawn();
     }
 

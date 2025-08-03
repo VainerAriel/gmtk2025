@@ -2244,7 +2244,7 @@ MonoBehaviour:
   deathOverlayAnimator: {fileID: 935262753}
   deathOverlayCanvasGroup: {fileID: 935262752}
   deathAnimation: {fileID: 7400000, guid: b1c4669cb280d1e43b6a38d304e9611b, type: 2}
-  respawnDelay: 0.5
+  respawnDelay: 0.3
   maxGhosts: 3
   startPosition: {x: -3.38, y: -2.55, z: 0}
   ghostPrefab: {fileID: 0}
@@ -3684,7 +3684,7 @@ CanvasGroup:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 935262750}
   m_Enabled: 1
-  m_Alpha: 0
+  m_Alpha: 1
   m_Interactable: 1
   m_BlocksRaycasts: 1
   m_IgnoreParentGroups: 0
