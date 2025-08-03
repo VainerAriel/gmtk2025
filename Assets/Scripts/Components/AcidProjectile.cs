@@ -357,7 +357,28 @@ public class AcidProjectile : MonoBehaviour
             return; // Exit early to prevent acid pool creation
         }
         
-        // If it's not a player, handle it as a regular collision
+        // Check if it's a ghost directly
+        GhostController ghost = other.GetComponent<GhostController>();
+        if (ghost != null)
+        {
+            if (debugMode)
+            {
+                Debug.Log($"[AcidProjectile] Direct ghost hit via trigger, destroying acid drop");
+            }
+            
+            hasHit = true;
+            
+            // Hide the projectile immediately for ghost hits
+            GetComponent<SpriteRenderer>().enabled = false;
+            GetComponent<Collider2D>().enabled = false;
+            
+            // Destroy the acid drop immediately when hitting ghost
+            DestroyAcidProjectile();
+            
+            return; // Exit early to prevent acid pool creation
+        }
+        
+        // If it's not a player or ghost, handle it as a regular collision
         Vector2 hitPoint = other.ClosestPoint(transform.position);
         RaycastHit2D hit = Physics2D.Raycast(transform.position, (hitPoint - (Vector2)transform.position).normalized, 0.1f);
         

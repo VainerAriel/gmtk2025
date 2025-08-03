@@ -107,7 +107,7 @@ public class AcidPool : MonoBehaviour
     
     private void OnTriggerEnter2D(Collider2D other)
     {
-        if (!isActive || isThisPoolDamagingPlayer) return;
+        if (!isActive) return;
         
         // Check if it's an acid projectile - if so, ignore it
         AcidProjectile acidProjectile = other.GetComponent<AcidProjectile>();
@@ -140,6 +140,28 @@ public class AcidPool : MonoBehaviour
             
             isThisPoolDamagingPlayer = true; // This specific pool is now damaging the player
             StartCoroutine(ApplyAcidDamage(player));
+        }
+        
+        // Check for ghost controller
+        GhostController ghost = other.GetComponent<GhostController>();
+        if (ghost != null)
+        {
+            // Check if ghost is already poisoned - if so, don't start ANY damage
+            if (ghost.IsPoisoned())
+            {
+                if (debugMode)
+                {
+                    Debug.Log($"[AcidPool] Ghost is already poisoned, ignoring acid pool - NO damage started");
+                }
+                return;
+            }
+            
+            if (debugMode)
+            {
+                Debug.Log($"[AcidPool] Ghost entered acid pool, starting damage over time");
+            }
+            
+            StartCoroutine(ApplyAcidDamageToGhost(ghost));
         }
     }
     
@@ -184,6 +206,16 @@ public class AcidPool : MonoBehaviour
                     break;
                 }
                 
+                // Additional safety check: if player health is 0, stop damage
+                if (currentHealth <= 0)
+                {
+                    if (debugMode)
+                    {
+                        Debug.Log($"[AcidPool] Player health is 0, stopping acid damage at tick {i + 1}");
+                    }
+                    break;
+                }
+                
                 // Apply damage
                 player.TakeDamage(damagePerTick);
                 
@@ -224,6 +256,88 @@ public class AcidPool : MonoBehaviour
         
         // Reset flag for this specific pool
         isThisPoolDamagingPlayer = false;
+    }
+    
+    /// <summary>
+    /// Apply acid damage to ghost over time
+    /// </summary>
+    private IEnumerator ApplyAcidDamageToGhost(GhostController ghost)
+    {
+        if (debugMode)
+        {
+            Debug.Log($"[AcidPool] Starting acid pool damage to ghost: {totalDamage} damage over {numberOfTicks} ticks");
+        }
+        
+        // Mark ghost as poisoned
+        ghost.SetPoisoned(true);
+        
+        float damagePerTick = totalDamage / numberOfTicks;
+        
+        for (int i = 0; i < numberOfTicks; i++)
+        {
+            if (ghost != null)
+            {
+                // Check if ghost is no longer poisoned
+                if (!ghost.IsPoisoned())
+                {
+                    if (debugMode)
+                    {
+                        Debug.Log($"[AcidPool] Ghost no longer poisoned, stopping acid damage");
+                    }
+                    break;
+                }
+                
+                // Apply damage directly to ghost's health
+                ghost.TakeDirectAcidDamage(damagePerTick);
+                
+                if (debugMode)
+                {
+                    Debug.Log($"[AcidPool] Applied tick {i + 1}/{numberOfTicks}: {damagePerTick} damage to ghost");
+                }
+            }
+            else
+            {
+                // Ghost reference lost, stop acid damage
+                if (debugMode)
+                {
+                    Debug.Log($"[AcidPool] Ghost reference lost, stopping acid damage");
+                }
+                break;
+            }
+            
+            yield return new WaitForSeconds(tickInterval);
+        }
+        
+        // Clear poison status when damage is complete (only if we set it)
+        if (ghost != null && ghost.IsPoisoned())
+        {
+            ghost.SetPoisoned(false);
+        }
+    }
+    
+    /// <summary>
+    /// Reset the acid pool to allow new damage applications
+    /// </summary>
+    public void ResetPool()
+    {
+        isThisPoolDamagingPlayer = false;
+        if (debugMode)
+        {
+            Debug.Log($"[AcidPool] Pool reset, can now damage new entities");
+        }
+    }
+    
+    /// <summary>
+    /// Reset all acid pools in the scene
+    /// </summary>
+    public static void ResetAllPools()
+    {
+        AcidPool[] pools = FindObjectsOfType<AcidPool>();
+        foreach (AcidPool pool in pools)
+        {
+            pool.ResetPool();
+        }
+        Debug.Log($"[AcidPool] Reset {pools.Length} acid pools");
     }
     
     private IEnumerator FlashPlayer(PlayerController player)
