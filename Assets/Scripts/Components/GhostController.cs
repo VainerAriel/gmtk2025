@@ -2,11 +2,11 @@ using UnityEngine;
 
 public class GhostController : MonoBehaviour
 {
+    [Header("Movement")]
     private PlayerController.PlayerAction[] recordedActions;
     private int currentActionIndex = 0;
     private float ghostStartTime;
     private Rigidbody2D rb;
-    private SpriteRenderer spriteRenderer;
     private bool isReplaying = true;
     private bool allowPhysicsAfterFreeze = false;
     private bool isGrounded = false;
@@ -19,16 +19,21 @@ public class GhostController : MonoBehaviour
     [SerializeField] private Color ghostColor = new Color(1f, 1f, 1f, 0.5f);
     [SerializeField] private LayerMask groundLayer = 256; // Same as player - Layer 8 (Ground)
     [SerializeField] private float groundCheckDistance = 0.1f;
-    [SerializeField] private string sortingLayerName = "Player"; // Sorting layer for visual rendering
-    [SerializeField] private int sortingOrder = 0; // Order within the sorting layer
+    [SerializeField] private string sortingLayerName = "Player";
+    [SerializeField] private int sortingOrder = 0;
     
     private PhysicsMaterial2D originalMaterial;
+    private SpriteRenderer spriteRenderer; // Add this missing field
     
     [Header("Transformation")]
     [SerializeField] private bool hasBeenHitByElectricity = false;
     [SerializeField] private bool hasBeenHitBySpike = false;
-    [SerializeField] private GameObject fallingGroundPrefab; // Fallback reference to the FallingGround prefab
-    private Vector2 lastBulletDirection = Vector2.right; // Store the last bullet direction for reflector logic
+    [SerializeField] private GameObject fallingGroundPrefab;
+    private Vector2 lastBulletDirection = Vector2.right;
+    
+    // POSITION-BASED REPLAY SYSTEM
+    private bool usePositionBasedReplay = true; // Use position-based replay for perfect accuracy
+    private float replaySpeed = 1f; // Can be adjusted for slow-motion effects
     
     public void Initialize(PlayerController.PlayerAction[] actions, bool allowPhysicsAfterFreeze, float moveSpeed, float jumpForce, PhysicsMaterial2D playerMaterial)
     {
@@ -36,95 +41,69 @@ public class GhostController : MonoBehaviour
         this.allowPhysicsAfterFreeze = allowPhysicsAfterFreeze;
         this.moveSpeed = moveSpeed;
         this.jumpForce = jumpForce;
-        // FIXED: Use the same time reference as the player's original recording session
-        // The ghost should start replaying at the same time the player started recording
-        // So we calculate the original game start time by subtracting the last action's timestamp from current time
+        
+        // Set up timing for position-based replay
         if (actions != null && actions.Length > 0)
         {
-            float lastActionTime = actions[actions.Length - 1].timestamp;
-            ghostStartTime = Time.time - lastActionTime;
-            Debug.Log($"[GhostController] Time sync: current time={Time.time}, last action time={lastActionTime}, ghost start time={ghostStartTime}");
-        }
-        else
-        {
             ghostStartTime = Time.time;
+            Debug.Log($"[GhostController] Position-based replay initialized with {actions.Length} recorded positions");
         }
+        
         currentActionIndex = 0;
         isReplaying = true;
         hasJumped = false;
-        hasBeenHitByElectricity = false; // Reset electricity hit state
-        hasBeenHitBySpike = false; // Reset spike hit state
+        hasBeenHitByElectricity = false;
+        hasBeenHitBySpike = false;
         
-        // Debug initialization
-        Debug.Log($"[GhostController] Initialized with {actions?.Length ?? 0} actions, moveSpeed={moveSpeed}, jumpForce={jumpForce}");
-        if (actions != null && actions.Length > 0)
+        // Set up components
+        SetupComponents(playerMaterial);
+        
+        // Set initial position
+        if (recordedActions.Length > 0)
         {
-            int jumpCount = 0;
-            foreach (var action in actions)
-            {
-                if (action.jumpPressed) jumpCount++;
-            }
-            Debug.Log($"[GhostController] Recorded actions contain {jumpCount} jump actions");
+            transform.position = recordedActions[0].position;
+            Debug.Log($"[GhostController] Set initial position to: {transform.position}");
         }
+    }
+    
+    private void SetupComponents(PhysicsMaterial2D playerMaterial)
+    {
+        // Set up collider
         BoxCollider2D ghostCollider = GetComponent<BoxCollider2D>();
         BoxCollider2D playerCollider = FindObjectOfType<PlayerController>().GetComponent<BoxCollider2D>();
-
+        
         if (ghostCollider != null && playerCollider != null)
         {
             ghostCollider.size = playerCollider.size;
             ghostCollider.offset = playerCollider.offset;
         }
-
-        // Get or add required components
+        
+        // Set up rigidbody
         rb = GetComponent<Rigidbody2D>();
         if (rb == null)
         {
             rb = gameObject.AddComponent<Rigidbody2D>();
         }
         
-        // Configure rigidbody for ghost behavior - EXACTLY like the player
-        rb.gravityScale = 3f; // Same as player
+        // Configure rigidbody for position-based replay
+        rb.gravityScale = 0f; // No gravity for position-based replay
         rb.freezeRotation = true;
-        rb.drag = 0f; // No drag to match player
-        rb.mass = 1f; // Same mass as player
-        rb.angularDrag = 0.05f; // Same as player
-        rb.interpolation = RigidbodyInterpolation2D.None; // Same as player
-        rb.sleepMode = RigidbodySleepMode2D.StartAwake; // Same as player
-        rb.constraints = RigidbodyConstraints2D.FreezeRotation; // Same as player
-        rb.bodyType = RigidbodyType2D.Dynamic; // Ensure same body type as player
+        rb.drag = 0f;
+        rb.mass = 1f;
+        rb.angularDrag = 0.05f;
+        rb.interpolation = RigidbodyInterpolation2D.None;
+        rb.sleepMode = RigidbodySleepMode2D.StartAwake;
+        rb.constraints = RigidbodyConstraints2D.FreezeRotation;
+        rb.bodyType = RigidbodyType2D.Kinematic; // Use kinematic for position-based replay
         
-        // Debug rigidbody setup
-        Debug.Log($"[GhostController] Rigidbody setup: gravityScale={rb.gravityScale}, mass={rb.mass}, bodyType={rb.bodyType}, isKinematic={rb.isKinematic}");
-        
-        // Check if rigidbody is kinematic (this would prevent jumping)
-        if (rb.isKinematic)
-        {
-            Debug.LogError($"[GhostController] WARNING: Rigidbody is kinematic! This will prevent jumping!");
-        }
-        
-        // Use the same physics material as the player
+        // Use physics material
         if (playerMaterial != null)
         {
             rb.sharedMaterial = playerMaterial;
-            originalMaterial = playerMaterial; // Store the original material
-        }
-        else
-        {
-            // Fallback: Try to load the ZeroFriction material directly
-            PhysicsMaterial2D zeroFrictionMaterial = Resources.Load<PhysicsMaterial2D>("ZeroFriction");
-            if (zeroFrictionMaterial == null)
-            {
-                // If not in Resources, try to load from the Components folder
-                zeroFrictionMaterial = Resources.Load<PhysicsMaterial2D>("Scripts/Components/ZeroFriction");
-            }
-            if (zeroFrictionMaterial != null)
-            {
-                rb.sharedMaterial = zeroFrictionMaterial;
-                originalMaterial = zeroFrictionMaterial;
-            }
+            originalMaterial = playerMaterial;
         }
         
-        // Set up visual appearance
+        // Set up visual
         spriteRenderer = GetComponent<SpriteRenderer>();
         if (spriteRenderer != null)
         {
@@ -133,54 +112,28 @@ public class GhostController : MonoBehaviour
             spriteRenderer.sortingOrder = sortingOrder;
         }
         
-        // Set up collider for physics mode - EXACTLY like the player
-        
+        // Set up collider
         if (ghostCollider != null)
         {
-            // Make it solid so it can interact with the real world
             ghostCollider.isTrigger = false;
-            ghostCollider.density = 1f; // Same as player
-            ghostCollider.usedByEffector = false; // Same as player
-            ghostCollider.usedByComposite = false; // Same as player
-            ghostCollider.sharedMaterial = null; // Same as player (no shared material on collider)
-            
-            // Debug collider setup
-            Debug.Log($"[GhostController] Collider setup: isTrigger={ghostCollider.isTrigger}, size={ghostCollider.size}, offset={ghostCollider.offset}");
-        }
-        else
-        {
-            Debug.LogError($"[GhostController] No BoxCollider2D found on ghost!");
+            ghostCollider.density = 1f;
+            ghostCollider.usedByEffector = false;
+            ghostCollider.usedByComposite = false;
+            ghostCollider.sharedMaterial = null;
         }
         
-        // Add a separate trigger collider for spike detection
+        // Add trigger collider for spike detection
         CircleCollider2D triggerCollider = gameObject.GetComponent<CircleCollider2D>();
         if (triggerCollider == null)
         {
             triggerCollider = gameObject.AddComponent<CircleCollider2D>();
         }
         triggerCollider.isTrigger = true;
-        triggerCollider.radius = 0.6f; // Slightly larger than the ghost
+        triggerCollider.radius = 0.6f;
         triggerCollider.offset = Vector2.zero;
         
-        // Ensure ghost is on Ghost layer (layer 7)
+        // Set layer
         gameObject.layer = 7;
-        Debug.Log($"[GhostController] Set to Ghost layer: {gameObject.layer}");
-        
-        // Ground layer is now set correctly in the inspector field
-        
-        // Set initial position
-        if (recordedActions.Length > 0)
-        {
-            transform.position = recordedActions[0].position;
-            Debug.Log($"[GhostController] Set initial position to: {transform.position}");
-            
-            // Compare with player position
-            PlayerController player = FindObjectOfType<PlayerController>();
-            if (player != null)
-            {
-                Debug.Log($"[GhostController] Player position: {player.transform.position}, Ghost position: {transform.position}");
-            }
-        }
     }
     
     public void RestartReplay()
@@ -224,6 +177,7 @@ public class GhostController : MonoBehaviour
         }
         
         // Reset visual appearance
+        SpriteRenderer spriteRenderer = GetComponent<SpriteRenderer>();
         if (spriteRenderer != null)
         {
             spriteRenderer.color = ghostColor;
@@ -238,159 +192,185 @@ public class GhostController : MonoBehaviour
     
     private void Update()
     {
-        if (!isReplaying)
-        {
-            // Ghost has finished replaying, just stay frozen
-            return;
-        }
-        
-        // Check if grounded
-        CheckGrounded();
-        
-        // Reset jump when grounded
-        if (isGrounded)
-        {
-            hasJumped = false;
-            Debug.Log($"[GhostController] Reset jump - now grounded");
-        }
+        if (!isReplaying) return;
         
         if (recordedActions == null || recordedActions.Length == 0 || currentActionIndex >= recordedActions.Length)
         {
-            // Ghost has finished replaying, freeze in place
             FreezeGhost();
             return;
         }
         
-        float currentTime = Time.time - ghostStartTime;
-        PlayerController.PlayerAction currentAction = recordedActions[currentActionIndex];
-        
-        // Check if it's time for the next action
-        if (currentTime >= currentAction.timestamp)
+        // POSITION-BASED REPLAY: Direct position interpolation
+        if (usePositionBasedReplay)
         {
-            // Apply the recorded action
-            Debug.Log($"[GhostController] Applying action at time {currentTime}: jumpPressed={currentAction.jumpPressed}, horizontalInput={currentAction.horizontalInput}");
-            ApplyAction(currentAction);
-            currentActionIndex++;
+            UpdatePositionBasedReplay();
+        }
+        else
+        {
+            UpdateInputBasedReplay();
         }
         
         // Update visual appearance
         UpdateVisualAppearance();
         
-        // Debug: Track velocity to see if jump force is being applied
-        if (rb != null && rb.velocity.y > 0)
-        {
-            Debug.Log($"[GhostController] Current velocity: {rb.velocity}");
-        }
-        
-        // Debug: Press T to test transformation
+        // Debug keys
         if (Input.GetKeyDown(KeyCode.T))
         {
-            Debug.Log($"[GhostController] Manual test transformation triggered by T key");
-            TransformIntoReflector(transform.position, Vector2.right); // Default to right direction for testing
+            ManualTransformIntoReflector();
         }
         
-        // Debug: Press Y to test spike transformation
         if (Input.GetKeyDown(KeyCode.Y))
         {
-            Debug.Log($"[GhostController] Manual test spike transformation triggered by Y key");
-            TransformIntoFallingGround();
-        }
-        
-        // Debug: Press U to test spike transformation with state check
-        if (Input.GetKeyDown(KeyCode.U))
-        {
-            Debug.Log($"[GhostController] Manual test spike transformation with state check triggered by U key");
-            if (!hasBeenHitBySpike)
-            {
-                hasBeenHitBySpike = true;
-                TransformIntoFallingGround();
-            }
-            else
-            {
-                Debug.Log($"[GhostController] Already hit by spike, resetting state and trying again");
-                hasBeenHitBySpike = false;
-                TransformIntoFallingGround();
-            }
+            ManualTransformIntoFallingGround();
         }
     }
     
-    private void CheckGrounded()
+    private void UpdatePositionBasedReplay()
     {
-        // Get the ghost's collider to find the bottom position - EXACTLY like the player
-        Collider2D ghostCollider = GetComponent<Collider2D>();
-        if (ghostCollider == null) return;
+        float currentTime = (Time.time - ghostStartTime) * replaySpeed;
         
-        // Calculate the bottom center of the ghost - EXACTLY like the player
-        Vector2 bottomCenter = (Vector2)transform.position + ghostCollider.offset;
+        // Find the two recorded positions to interpolate between
+        int nextIndex = currentActionIndex + 1;
+        
+        if (nextIndex < recordedActions.Length)
+        {
+            PlayerController.PlayerAction currentAction = recordedActions[currentActionIndex];
+            PlayerController.PlayerAction nextAction = recordedActions[nextIndex];
+            
+            // Calculate interpolation factor
+            float timeDiff = nextAction.timestamp - currentAction.timestamp;
+            float elapsedTime = currentTime - currentAction.timestamp;
+            float t = timeDiff > 0 ? elapsedTime / timeDiff : 0f;
+            
+            // Clamp t to prevent overshooting
+            t = Mathf.Clamp01(t);
+            
+            // Interpolate position
+            Vector3 interpolatedPosition = Vector3.Lerp(currentAction.position, nextAction.position, t);
+            
+            // FIXED: Check for ground collision and prevent sinking
+            Vector3 finalPosition = CheckGroundCollision(interpolatedPosition);
+            transform.position = finalPosition;
+            
+            // Interpolate velocity for visual effects
+            Vector2 interpolatedVelocity = Vector2.Lerp(currentAction.velocity, nextAction.velocity, t);
+            rb.velocity = interpolatedVelocity;
+            
+            // Update sprite direction based on velocity
+            if (interpolatedVelocity.x > 0.1f)
+            {
+                transform.localScale = new Vector3(1, transform.localScale.y, transform.localScale.z);
+            }
+            else if (interpolatedVelocity.x < -0.1f)
+            {
+                transform.localScale = new Vector3(-1, transform.localScale.y, transform.localScale.z);
+            }
+            
+            // Move to next action when we've reached it
+            if (currentTime >= nextAction.timestamp)
+            {
+                currentActionIndex = nextIndex;
+            }
+        }
+        else
+        {
+            // We're at the last action, just stay there
+            Vector3 finalPosition = CheckGroundCollision(recordedActions[currentActionIndex].position);
+            transform.position = finalPosition;
+        }
+    }
+    
+    private Vector3 CheckGroundCollision(Vector3 targetPosition)
+    {
+        // Get the ghost's collider
+        Collider2D ghostCollider = GetComponent<Collider2D>();
+        if (ghostCollider == null) return targetPosition;
+        
+        // Calculate the bottom of the ghost
+        Vector2 bottomCenter = (Vector2)targetPosition + ghostCollider.offset;
         bottomCenter.y -= ghostCollider.bounds.extents.y;
         
-        // Cast ray from bottom center downward - EXACTLY like the player
-        RaycastHit2D hit = Physics2D.Raycast(bottomCenter, Vector2.down, groundCheckDistance, groundLayer);
-        isGrounded = hit.collider != null;
+        // Cast a ray downward to check for ground
+        RaycastHit2D hit = Physics2D.Raycast(bottomCenter, Vector2.down, groundCheckDistance + 0.1f, groundLayer);
         
-
-        
-        // Debug visualization - EXACTLY like the player
-        Debug.DrawRay(bottomCenter, Vector2.down * groundCheckDistance, isGrounded ? Color.green : Color.red);
-        
-        // Debug ground detection
-        Debug.Log($"[GhostController] Ground check: bottomCenter={bottomCenter}, isGrounded={isGrounded}, hit.collider={(hit.collider != null ? hit.collider.name : "NULL")}, layer={hit.collider?.gameObject.layer ?? 0}, groundLayer.value={groundLayer.value}, groundCheckDistance={groundCheckDistance}");
-        
-        // If not grounded, let's check what's actually there
-        if (!isGrounded)
+        if (hit.collider != null)
         {
-            // Cast a longer ray to see what's below
-            RaycastHit2D[] allHits = Physics2D.RaycastAll(bottomCenter, Vector2.down, 2f);
-            Debug.Log($"[GhostController] No ground detected. All objects below: {allHits.Length} hits");
-            foreach (var rayHit in allHits)
+            // Calculate the correct Y position to sit on top of the ground
+            float groundY = hit.point.y + ghostCollider.bounds.extents.y - ghostCollider.offset.y;
+            
+            // Only adjust if the ghost would be below the ground
+            if (targetPosition.y < groundY)
             {
-                Debug.Log($"[GhostController] Hit: {rayHit.collider.name} on layer {rayHit.collider.gameObject.layer} at distance {rayHit.distance}");
+                return new Vector3(targetPosition.x, groundY, targetPosition.z);
             }
+        }
+        
+        return targetPosition;
+    }
+    
+    private void UpdateInputBasedReplay()
+    {
+        // Original input-based replay (fallback)
+        isGrounded = CheckGroundedState();
+        
+        if (isGrounded)
+        {
+            hasJumped = false;
+        }
+        
+        float currentTime = Time.time - ghostStartTime;
+        
+        if (currentActionIndex < recordedActions.Length && currentTime >= recordedActions[currentActionIndex].timestamp)
+        {
+            PlayerController.PlayerAction action = recordedActions[currentActionIndex];
+            ApplyAction(action);
+            currentActionIndex++;
+        }
+        
+        StopMovementIfNoInput();
+    }
+    
+    private void StopMovementIfNoInput()
+    {
+        if (rb == null || currentActionIndex >= recordedActions.Length) return;
+        
+        // Get the current action's input
+        PlayerController.PlayerAction currentAction = recordedActions[currentActionIndex];
+        
+        // If there's no horizontal input, stop horizontal movement
+        if (Mathf.Abs(currentAction.horizontalInput) < 0.1f)
+        {
+            Vector2 velocity = rb.velocity;
+            velocity.x = 0f; // Stop horizontal movement
+            rb.velocity = velocity;
         }
     }
     
     private void ApplyAction(PlayerController.PlayerAction action)
     {
-        // Use velocity-based movement - EXACTLY like the player does
         if (rb != null)
         {
-            // Set horizontal velocity directly - EXACTLY like the player does
+            // Apply movement based on the recorded action
             Vector2 velocity = rb.velocity;
-            velocity.x = action.horizontalInput * moveSpeed; // Same speed as player
+            velocity.x = action.horizontalInput * moveSpeed;
             rb.velocity = velocity;
             
-            // Handle jump if it was pressed and ghost is actually grounded - EXACTLY like the player
-            Debug.Log($"[GhostController] Checking jump: action.jumpPressed={action.jumpPressed}, isGrounded={isGrounded}, hasJumped={hasJumped}, rb.isKinematic={rb.isKinematic}");
+            // Handle jump if it was pressed
             if (action.jumpPressed && isGrounded && !hasJumped)
             {
-                // Apply jump force - EXACTLY like the player
-                Debug.Log($"[GhostController] JUMPING! action.jumpPressed: {action.jumpPressed}, isGrounded: {isGrounded}, hasJumped: {hasJumped}");
-                if (rb.isKinematic)
-                {
-                    Debug.LogError($"[GhostController] ERROR: Cannot jump - rigidbody is kinematic!");
-                }
-                else
-                {
-                    Debug.Log($"[GhostController] Applying jump force: {jumpForce} to rigidbody");
-                    rb.AddForce(Vector2.up * jumpForce, ForceMode2D.Impulse);
-                    hasJumped = true;
-                    Debug.Log($"[GhostController] Jump force applied. New velocity: {rb.velocity}, hasJumped: {hasJumped}");
-                }
+                rb.AddForce(Vector2.up * jumpForce, ForceMode2D.Impulse);
+                hasJumped = true;
             }
-            else if (action.jumpPressed)
+            
+            // Flip sprite
+            if (action.horizontalInput > 0)
             {
-                Debug.Log($"[GhostController] Jump conditions not met: action.jumpPressed: {action.jumpPressed}, isGrounded: {isGrounded}, hasJumped: {hasJumped}");
+                transform.localScale = new Vector3(1, transform.localScale.y, transform.localScale.z);
             }
-        }
-        
-        // Flip character sprite based on movement direction - EXACTLY like the player does
-        if (action.horizontalInput > 0)
-        {
-            transform.localScale = new Vector3(1, transform.localScale.y, transform.localScale.z); // Face right
-        }
-        else if (action.horizontalInput < 0)
-        {
-            transform.localScale = new Vector3(-1, transform.localScale.y, transform.localScale.z); // Face left
+            else if (action.horizontalInput < 0)
+            {
+                transform.localScale = new Vector3(-1, transform.localScale.y, transform.localScale.z);
+            }
         }
     }
     
@@ -398,67 +378,57 @@ public class GhostController : MonoBehaviour
     {
         isReplaying = false;
         
-        // IMMEDIATELY stop all movement to prevent sliding
         if (rb != null)
         {
-            rb.velocity = Vector2.zero; // Stop all movement immediately
-            rb.isKinematic = true; // Make it kinematic so it doesn't move at all
+            rb.velocity = Vector2.zero;
+            rb.isKinematic = true;
         }
         
         if (allowPhysicsAfterFreeze)
         {
-            // Let physics continue naturally (ghost will fall, bounce, etc.)
-            // But first stop the current movement
             if (rb != null)
             {
-                rb.isKinematic = false; // Make it dynamic again for physics
-                rb.velocity = Vector2.zero; // But stop current movement
+                rb.isKinematic = false;
+                rb.velocity = Vector2.zero;
+                rb.gravityScale = 3f; // Restore gravity
             }
             
             if (spriteRenderer != null)
             {
                 Color frozenColor = spriteRenderer.color;
-                frozenColor.a = ghostAlpha * 0.8f; // Slightly more transparent when frozen
+                frozenColor.a = ghostAlpha * 0.8f;
                 spriteRenderer.color = frozenColor;
             }
         }
         else
         {
-            // Keep it kinematic to prevent any movement
             if (rb != null)
             {
-                rb.isKinematic = true; // Make it kinematic so it doesn't fall
+                rb.isKinematic = true;
             }
         }
         
-        // Always change to high friction material when frozen to prevent sliding
         if (rb != null)
         {
-            // Create a high friction material for frozen ghosts
             PhysicsMaterial2D frozenMaterial = new PhysicsMaterial2D();
             frozenMaterial.name = "FrozenGhostMaterial";
-            frozenMaterial.friction = 1f; // High friction to prevent sliding
-            frozenMaterial.bounciness = 0f; // No bouncing
+            frozenMaterial.friction = 1f;
+            frozenMaterial.bounciness = 0f;
             rb.sharedMaterial = frozenMaterial;
         }
         
-        // Make the ghost slightly more transparent when frozen
         if (spriteRenderer != null)
         {
             Color frozenColor = spriteRenderer.color;
-            frozenColor.a = ghostAlpha * 0.7f; // Make it more transparent when frozen
+            frozenColor.a = ghostAlpha * 0.7f;
             spriteRenderer.color = frozenColor;
         }
-        
-        // Optional: Add a subtle visual effect to indicate it's frozen
-        // You could add a particle effect or change the color here
     }
     
     private void UpdateVisualAppearance()
     {
         if (spriteRenderer != null)
         {
-            // Make ghost slightly transparent and add a subtle glow effect
             Color currentColor = spriteRenderer.color;
             currentColor.a = ghostAlpha;
             spriteRenderer.color = currentColor;
@@ -821,7 +791,6 @@ public class GhostController : MonoBehaviour
     
     private bool CheckGroundedState()
     {
-        // Use the same ground check logic as the player
         Collider2D ghostCollider = GetComponent<Collider2D>();
         if (ghostCollider == null) return false;
         
