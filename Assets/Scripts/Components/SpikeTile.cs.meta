@@ -1,10 +1,9 @@
 fileFormatVersion: 2
-guid: 2b7c46903e0798d5892377d75f1c7188
+guid: a043e8c0afa7a6640aa459881a3a0443
 MonoImporter:
   externalObjects: {}
   serializedVersion: 2
-  defaultReferences:
-  - fallingGroundPrefab: {fileID: 1234567890123456789, guid: 12345678901234567890123456789012, type: 3}
+  defaultReferences: []
   executionOrder: 0
   icon: {instanceID: 0}
   userData: 
